@@ -183,7 +183,7 @@ Goal: 5 senior analysts can use it for a week and report ≥3 hours saved per an
 - [ ] Supabase: re-enable email confirmation for production if disabled during dev
 - [ ] Run `alembic upgrade head` against production Supabase (direct connection)
 - [ ] Run ingestion against production database
-- [ ] End-to-end test on deployed URLs with a real Driftwood-style email account
+- [ ] End-to-end test on deployed URLs with a real Meridian-style email account
 
 ---
 
@@ -191,7 +191,7 @@ Goal: 5 senior analysts can use it for a week and report ≥3 hours saved per an
 
 | Doc | Purpose |
 | --- | ------- |
-| [client-brief.md](client-brief.md) | What Driftwood needs and example questions |
+| [client-brief.md](client-brief.md) | What Meridian Research needs and example questions |
 | [architecture.md](architecture.md) | System design, data model, streaming contract |
 | [guides/supabase-setup.md](guides/supabase-setup.md) | Hosted Postgres + Auth |
 | [guides/backend-setup.md](guides/backend-setup.md) | FastAPI + Alembic commands |

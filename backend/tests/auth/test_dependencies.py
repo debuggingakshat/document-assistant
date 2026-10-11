@@ -13,7 +13,7 @@ from app.main import app
 client = TestClient(app)
 
 _FAKE_USER_ID = uuid.uuid4()
-_FAKE_EMAIL = "analyst@driftwood.com"
+_FAKE_EMAIL = "analyst@meridianresearch.com"
 
 
 def _mock_user_response(user_id: uuid.UUID = _FAKE_USER_ID, email: str = _FAKE_EMAIL):

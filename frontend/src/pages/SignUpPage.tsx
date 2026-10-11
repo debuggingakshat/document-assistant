@@ -106,7 +106,7 @@ export function SignUpPage() {
               <Input
                 id="email"
                 type="email"
-                placeholder="analyst@driftwood.com"
+                placeholder="analyst@meridianresearch.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required

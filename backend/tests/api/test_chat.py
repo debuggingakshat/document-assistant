@@ -12,10 +12,10 @@ from app.main import app
 client = TestClient(app)
 
 _USER_A_ID = uuid.uuid4()
-_USER_A = AuthenticatedUser(id=_USER_A_ID, email="user_a@driftwood.com")
+_USER_A = AuthenticatedUser(id=_USER_A_ID, email="user_a@meridianresearch.com")
 
 _USER_B_ID = uuid.uuid4()
-_USER_B = AuthenticatedUser(id=_USER_B_ID, email="user_b@driftwood.com")
+_USER_B = AuthenticatedUser(id=_USER_B_ID, email="user_b@meridianresearch.com")
 
 _NOW = datetime.now(UTC).isoformat()
 
