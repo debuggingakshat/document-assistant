@@ -42,7 +42,7 @@ async def stream_stubbed_chat(
     )
 
     stubbed_reply = (
-        f"I received your question: \"{user_content}\".\n\n"
+        f'I received your question: "{user_content}".\n\n'
         "I am currently running in stubbed mode (Phase 3). "
         "In subsequent phases, I will retrieve relevant passages from SEC 10-K and 10-Q filings, "
         "apply hybrid search with Reciprocal Rank Fusion, and provide grounded answers with citations."

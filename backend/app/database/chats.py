@@ -18,7 +18,9 @@ def ensure_profile(client: Client, user_id: uuid.UUID, email: str) -> None:
     ).execute()
 
 
-def create_thread(client: Client, user_id: uuid.UUID, title: str | None = None) -> dict[str, Any]:
+def create_thread(
+    client: Client, user_id: uuid.UUID, title: str | None = None
+) -> dict[str, Any]:
     """Create a new chat thread for the given user."""
     payload: dict[str, Any] = {"user_id": str(user_id)}
     if title is not None:
@@ -41,7 +43,7 @@ def list_threads(client: Client, user_id: uuid.UUID) -> list[dict[str, Any]]:
         .order("updated_at", desc=True)
         .execute()
     )
-    return response.data or []
+    return response.data if response else None or []
 
 
 def get_thread(client: Client, thread_id: uuid.UUID) -> dict[str, Any] | None:
@@ -53,7 +55,7 @@ def get_thread(client: Client, thread_id: uuid.UUID) -> dict[str, Any] | None:
         .maybe_single()
         .execute()
     )
-    return response.data
+    return response.data if response else None
 
 
 def update_thread(client: Client, thread_id: uuid.UUID, title: str) -> dict[str, Any]:
@@ -85,7 +87,7 @@ def list_messages(client: Client, thread_id: uuid.UUID) -> list[dict[str, Any]]:
         .order("created_at", desc=False)
         .execute()
     )
-    return response.data or []
+    return response.data if response else None or []
 
 
 def save_message(
@@ -116,3 +118,44 @@ def save_message(
     ).eq("id", str(thread_id)).execute()
 
     return data[0]
+
+
+def save_citations(
+    client: Client,
+    message_id: uuid.UUID,
+    citations: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Insert normalized citation rows for an assistant message."""
+    if not citations:
+        return []
+
+    rows: list[dict[str, Any]] = []
+    for idx, c in enumerate(citations, start=1):
+        rows.append(
+            {
+                "message_id": str(message_id),
+                "chunk_id": str(c["chunk_id"]),
+                "citation_index": c.get("citation_index", idx),
+                "ticker": c.get("ticker"),
+                "filing_type": c.get("filing_type", "10-K"),
+                "filing_date": c.get("filing_date"),
+                "section": c.get("section"),
+                "page": c.get("page"),
+                "excerpt": c.get("snippet") or c.get("excerpt"),
+            }
+        )
+
+    response = client.table("message_citations").insert(rows).execute()
+    return response.data if response else None or []
+
+
+def list_citations(client: Client, message_id: uuid.UUID) -> list[dict[str, Any]]:
+    """List all citations linked to a specific assistant message."""
+    response = (
+        client.table("message_citations")
+        .select("*")
+        .eq("message_id", str(message_id))
+        .order("citation_index", desc=False)
+        .execute()
+    )
+    return response.data if response else None or []

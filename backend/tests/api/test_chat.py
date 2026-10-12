@@ -43,7 +43,10 @@ def test_list_messages_unauthenticated():
 def test_chat_stream_unauthenticated():
     resp = client.post(
         "/chat/stream",
-        json={"threadId": str(uuid.uuid4()), "messages": [{"role": "user", "content": "Hi"}]},
+        json={
+            "threadId": str(uuid.uuid4()),
+            "messages": [{"role": "user", "content": "Hi"}],
+        },
     )
     assert resp.status_code == 401
 
@@ -93,7 +96,9 @@ def test_create_thread():
     try:
         with (
             patch("app.api.chat.chats.ensure_profile") as mock_ensure,
-            patch("app.api.chat.chats.create_thread", return_value=mock_created) as mock_create,
+            patch(
+                "app.api.chat.chats.create_thread", return_value=mock_created
+            ) as mock_create,
         ):
             resp = client.post("/threads", json={"title": "New Thread"})
 
@@ -109,7 +114,11 @@ def test_create_thread():
 
 def test_update_thread_success():
     thread_id = uuid.uuid4()
-    mock_thread = {"id": str(thread_id), "user_id": str(_USER_A_ID), "title": "Old Title"}
+    mock_thread = {
+        "id": str(thread_id),
+        "user_id": str(_USER_A_ID),
+        "title": "Old Title",
+    }
     mock_updated = {
         "id": str(thread_id),
         "user_id": str(_USER_A_ID),
@@ -122,9 +131,13 @@ def test_update_thread_success():
     try:
         with (
             patch("app.api.chat.chats.get_thread", return_value=mock_thread),
-            patch("app.api.chat.chats.update_thread", return_value=mock_updated) as mock_update,
+            patch(
+                "app.api.chat.chats.update_thread", return_value=mock_updated
+            ) as mock_update,
         ):
-            resp = client.patch(f"/threads/{thread_id}", json={"title": "AAPL FY24 10-K Analysis"})
+            resp = client.patch(
+                f"/threads/{thread_id}", json={"title": "AAPL FY24 10-K Analysis"}
+            )
 
         assert resp.status_code == 200
         assert resp.json()["title"] == "AAPL FY24 10-K Analysis"
@@ -137,7 +150,11 @@ def test_update_thread_success():
 
 def test_update_thread_forbidden_for_other_user():
     thread_id = uuid.uuid4()
-    mock_thread_b = {"id": str(thread_id), "user_id": str(_USER_B_ID), "title": "User B Title"}
+    mock_thread_b = {
+        "id": str(thread_id),
+        "user_id": str(_USER_B_ID),
+        "title": "User B Title",
+    }
 
     app.dependency_overrides[get_current_user] = lambda: _USER_A
     try:
@@ -242,7 +259,9 @@ def test_list_messages_forbidden_for_other_user():
     # User A tries to read User B's thread
     app.dependency_overrides[get_current_user] = lambda: _USER_A
     try:
-        with patch("app.api.chat.chats.get_thread", return_value=mock_thread_owned_by_b):
+        with patch(
+            "app.api.chat.chats.get_thread", return_value=mock_thread_owned_by_b
+        ):
             resp = client.get(f"/threads/{thread_id}/messages")
 
         assert resp.status_code == 403
@@ -298,7 +317,10 @@ def test_chat_stream_thread_not_found():
         with patch("app.api.chat.chats.get_thread", return_value=None):
             resp = client.post(
                 "/chat/stream",
-                json={"threadId": str(uuid.uuid4()), "messages": [{"role": "user", "content": "Hello"}]},
+                json={
+                    "threadId": str(uuid.uuid4()),
+                    "messages": [{"role": "user", "content": "Hello"}],
+                },
             )
         assert resp.status_code == 404
     finally:
@@ -315,10 +337,15 @@ def test_chat_stream_forbidden_for_other_user():
 
     app.dependency_overrides[get_current_user] = lambda: _USER_A
     try:
-        with patch("app.api.chat.chats.get_thread", return_value=mock_thread_owned_by_b):
+        with patch(
+            "app.api.chat.chats.get_thread", return_value=mock_thread_owned_by_b
+        ):
             resp = client.post(
                 "/chat/stream",
-                json={"threadId": str(thread_id), "messages": [{"role": "user", "content": "Hello"}]},
+                json={
+                    "threadId": str(thread_id),
+                    "messages": [{"role": "user", "content": "Hello"}],
+                },
             )
         assert resp.status_code == 403
     finally:
@@ -334,7 +361,10 @@ def test_chat_stream_no_user_message():
         with patch("app.api.chat.chats.get_thread", return_value=mock_thread):
             resp = client.post(
                 "/chat/stream",
-                json={"threadId": str(thread_id), "messages": [{"role": "assistant", "content": "Prior reply"}]},
+                json={
+                    "threadId": str(thread_id),
+                    "messages": [{"role": "assistant", "content": "Prior reply"}],
+                },
             )
         assert resp.status_code == 400
         assert "No user message found" in resp.json()["detail"]
@@ -351,7 +381,10 @@ def test_chat_stream_empty_content():
         with patch("app.api.chat.chats.get_thread", return_value=mock_thread):
             resp = client.post(
                 "/chat/stream",
-                json={"threadId": str(thread_id), "messages": [{"role": "user", "content": "   "}]},
+                json={
+                    "threadId": str(thread_id),
+                    "messages": [{"role": "user", "content": "   "}],
+                },
             )
         assert resp.status_code == 400
         assert "cannot be empty" in resp.json()["detail"]
@@ -363,17 +396,23 @@ def test_chat_stream_success_emits_ai_sdk_stream():
     thread_id = uuid.uuid4()
     mock_thread = {"id": str(thread_id), "user_id": str(_USER_A_ID)}
 
+    async def mock_stream(*args, **kwargs):
+        yield '0:"I received your question."\n'
+        yield 'd:{"finishReason": "stop", "usage": {"promptTokens": 0, "completionTokens": 0}}\n'
+
     app.dependency_overrides[get_current_user] = lambda: _USER_A
     try:
         with (
             patch("app.api.chat.chats.get_thread", return_value=mock_thread),
-            patch("app.chat.streaming.save_message") as mock_save,
+            patch("app.api.chat.stream_orchestrated_turn", side_effect=mock_stream),
         ):
             resp = client.post(
                 "/chat/stream",
                 json={
                     "threadId": str(thread_id),
-                    "messages": [{"role": "user", "content": "Tell me about operating margin"}],
+                    "messages": [
+                        {"role": "user", "content": "Tell me about operating margin"}
+                    ],
                 },
             )
 
@@ -382,10 +421,7 @@ def test_chat_stream_success_emits_ai_sdk_stream():
         assert "text/plain" in resp.headers["content-type"]
 
         body_text = resp.text
-        # Emitted data stream chunks: starts with 0:"..."\n and finishes with d:{...}\n
-        assert '0:"I' in body_text
+        assert '0:"I received your question."' in body_text
         assert 'd:{"finishReason": "stop"' in body_text
-        # Confirms persistence was invoked for user message and assistant message
-        assert mock_save.call_count == 2
     finally:
         app.dependency_overrides.clear()

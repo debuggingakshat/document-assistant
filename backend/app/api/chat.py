@@ -9,7 +9,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from app.auth.dependencies import AuthenticatedUser, get_current_user
-from app.chat.streaming import stream_stubbed_chat
+from app.chat.orchestrator import stream_orchestrated_turn
 from app.database import chats
 from app.database.supabase import get_service_role_client
 
@@ -69,7 +69,9 @@ async def list_threads(
     return chats.list_threads(client=client, user_id=user.id)
 
 
-@router.post("/threads", response_model=ThreadResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/threads", response_model=ThreadResponse, status_code=status.HTTP_201_CREATED
+)
 async def create_thread(
     body: CreateThreadRequest,
     user: Annotated[AuthenticatedUser, Depends(get_current_user)],
@@ -101,7 +103,9 @@ async def update_thread(
             detail="You do not have access to this thread",
         )
 
-    return chats.update_thread(client=client, thread_id=thread_id, title=body.title.strip())
+    return chats.update_thread(
+        client=client, thread_id=thread_id, title=body.title.strip()
+    )
 
 
 @router.delete("/threads/{thread_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -148,6 +152,16 @@ async def list_thread_messages(
         )
 
     return chats.list_messages(client=client, thread_id=thread_id)
+
+
+@router.get("/messages/{message_id}/citations")
+async def list_message_citations(
+    message_id: uuid.UUID,
+    user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+) -> list[dict[str, Any]]:
+    """Fetch stored citations for a specific assistant message."""
+    client = get_service_role_client()
+    return chats.list_citations(client=client, message_id=message_id)
 
 
 @router.post("/chat/stream")
@@ -207,7 +221,7 @@ async def chat_stream(
         )
 
     return StreamingResponse(
-        stream_stubbed_chat(
+        stream_orchestrated_turn(
             client=client,
             thread_id=body.thread_id,
             user_content=content,
