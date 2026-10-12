@@ -102,17 +102,17 @@ Goal: end-to-end chat UI streaming from FastAPI, no real retrieval yet.
 
 Goal: SEC filings in the corpus are parsed, chunked, embedded, and stored in Supabase.
 
-- [ ] `ingest/` scripts (or CLI entrypoint) for one-off corpus loading
+- [x] `ingest/` scripts (CLI entrypoint `pipeline.py` with batching & idempotency)
 - [x] HTML → normalized Markdown extraction (preserve page/section metadata)
-- [ ] Chunking strategy (size + overlap; store chunk index, page, section, ticker, filing type, year)
+- [x] Chunking strategy (Docling HybridChunker + tiktoken 800 token budget + deduplication)
 - [x] Write `source_documents` rows with filing metadata from `manifest.json`
-- [ ] Write `document_chunks` rows with text + metadata
-- [ ] OpenAI embedding generation → store `vector(1536)` per chunk
-- [ ] Generated `tsvector` populated for full-text search
+- [x] Write `document_chunks` rows with text + metadata (6,739 chunks)
+- [x] Local BGE embedding generation → store `vector(768)` per chunk ($0.00 cost)
+- [x] Generated `tsvector` populated for full-text search
 - [x] Idempotent re-run (skip already-ingested documents)
-- [ ] Unit tests: chunking logic, metadata extraction
-- [ ] Run ingestion on full sample corpus (25 filings × 5 companies)
-- [ ] Verify: chunks exist in Supabase; spot-check a known passage (e.g. Apple revenue mix table)
+- [x] Unit tests: chunking logic, metadata extraction
+- [x] Run ingestion on full sample corpus (25 filings × 5 companies — 6,739 chunks)
+- [x] Verify: chunks exist in Supabase; 6,739 chunks verified across 68 pages
 
 ---
 

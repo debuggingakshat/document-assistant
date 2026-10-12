@@ -19,9 +19,15 @@ class Settings(BaseSettings):
     supabase_anon_key: str = Field(min_length=1)
     supabase_service_role_key: str = Field(min_length=1)
     database_url: str = Field(min_length=1)
-    openai_api_key: str = Field(min_length=1)
-    openai_embedding_model: str = "text-embedding-3-small"
-    openai_embedding_dimensions: int = 1536
+    openai_api_key: str = Field(default="")
+    
+    # Embedding configuration: default to local 768-dim BGE model (100% free)
+    embedding_provider: str = "local"
+    embedding_model: str = "BAAI/bge-base-en-v1.5"
+    embedding_dimensions: int = 768
+    openai_embedding_model: str = "BAAI/bge-base-en-v1.5"
+    openai_embedding_dimensions: int = 768
+    
     allowed_origins: Annotated[list[str], NoDecode] = Field(min_length=1)
 
     @field_validator("allowed_origins", mode="before")
@@ -34,5 +40,5 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-# OpenAI's SDK reads OPENAI_API_KEY from the process environment.
-os.environ["OPENAI_API_KEY"] = settings.openai_api_key
+if settings.openai_api_key:
+    os.environ["OPENAI_API_KEY"] = settings.openai_api_key

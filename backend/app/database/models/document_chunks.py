@@ -35,7 +35,7 @@ class DocumentChunk(Base):
     chunk_text: Mapped[str] = mapped_column(Text)
     token_count: Mapped[int] = mapped_column(Integer)
     embedding: Mapped[list[float] | None] = mapped_column(
-        Vector(settings.openai_embedding_dimensions), default=None
+        Vector(settings.embedding_dimensions), default=None
     )
     # Populated by a Postgres generated column — read-only in Python.
     search_vector: Mapped[None] = mapped_column(
