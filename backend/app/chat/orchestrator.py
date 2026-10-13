@@ -38,24 +38,33 @@ class TurnResult:
 
 
 def _extract_ticker_and_fy(query: str) -> tuple[str | None, int | None]:
-    """Lightweight heuristic to detect company ticker and fiscal year in user queries."""
+    """Lightweight heuristic to detect company ticker and fiscal year in user queries.
+    
+    If multiple companies are mentioned (e.g. comparisons across AAPL, MSFT, etc.),
+    ticker is set to None so hybrid retrieval searches across the entire multi-company corpus.
+    """
     query_upper = query.upper()
-    ticker = None
+    detected_tickers: set[str] = set()
+
     if "AAPL" in query_upper or "APPLE" in query_upper:
-        ticker = "AAPL"
-    elif "NVDA" in query_upper or "NVIDIA" in query_upper:
-        ticker = "NVDA"
-    elif "MSFT" in query_upper or "MICROSOFT" in query_upper:
-        ticker = "MSFT"
-    elif "AMZN" in query_upper or "AMAZON" in query_upper:
-        ticker = "AMZN"
-    elif (
+        detected_tickers.add("AAPL")
+    if "NVDA" in query_upper or "NVIDIA" in query_upper:
+        detected_tickers.add("NVDA")
+    if "MSFT" in query_upper or "MICROSOFT" in query_upper:
+        detected_tickers.add("MSFT")
+    if "AMZN" in query_upper or "AMAZON" in query_upper:
+        detected_tickers.add("AMZN")
+    if (
         "GOOGL" in query_upper
         or "GOOG" in query_upper
         or "ALPHABET" in query_upper
         or "GOOGLE" in query_upper
     ):
-        ticker = "GOOGL"
+        detected_tickers.add("GOOGL")
+
+    # Only filter by ticker if EXACTLY ONE company was referenced.
+    # For comparisons or multi-company queries, return None to search the full corpus.
+    ticker = detected_tickers.pop() if len(detected_tickers) == 1 else None
 
     import re
 

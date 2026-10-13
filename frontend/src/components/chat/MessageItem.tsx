@@ -3,13 +3,16 @@ import {
   AlertTriangle,
   Bot,
   Check,
+  Clock,
   Copy,
   ExternalLink,
   FileSpreadsheet,
   ShieldCheck,
+  Sparkles,
   User,
 } from "lucide-react"
 import type { Citation, Message } from "@/lib/api"
+import { formatFullDateTime, formatMessageTime } from "@/lib/dateUtils"
 import { cn } from "@/lib/utils"
 
 interface MessageItemProps {
@@ -25,6 +28,9 @@ export function MessageItem({
 }: MessageItemProps) {
   const isUser = message.role === "user"
   const [copied, setCopied] = useState(false)
+
+  const timeDisplay = formatMessageTime(message.created_at)
+  const fullDateTimeDisplay = formatFullDateTime(message.created_at)
 
   async function handleCopy() {
     try {
@@ -46,11 +52,9 @@ export function MessageItem({
 
   // Parse text into regular text and clickable citation tokens
   function renderFormattedContent(text: string) {
-    // Check if the response contains a fail-closed Grounding Verification Alert
     const hasGroundingWarning =
       text.includes("[!WARNING]") || text.includes("Grounding Verification Alert")
 
-    // Split text by markdown citation footnotes like [^1], [^2]
     const parts = text.split(/(\[\^\d+\])/g)
 
     return (
@@ -110,99 +114,149 @@ export function MessageItem({
   return (
     <div
       className={cn(
-        "group relative flex w-full gap-3 py-4 transition-colors",
+        "group relative flex w-full gap-3 py-3 transition-colors",
         isUser ? "justify-end" : "justify-start"
       )}
     >
+      {/* Assistant Avatar */}
       {!isUser && (
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-border/80 bg-foreground text-background shadow-xs">
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-border/80 bg-foreground text-background shadow-xs mt-0.5">
           <Bot className="h-3.5 w-3.5" />
         </div>
       )}
 
       <div
         className={cn(
-          "relative max-w-[85%] rounded-2xl px-4 py-3 text-[13.5px] leading-relaxed tracking-normal",
-          isUser
-            ? "bg-primary text-primary-foreground shadow-xs"
-            : "border border-border/70 bg-card text-foreground shadow-xs"
+          "relative flex flex-col max-w-[85%]",
+          isUser ? "items-end" : "items-start"
         )}
       >
-        <div className="whitespace-pre-wrap break-words font-normal">
-          {renderFormattedContent(message.content)}
-          {!isUser && isStreamingLast && (
-            <span className="inline-block h-3.5 w-1.5 animate-pulse bg-foreground align-middle ml-1" />
+        {/* Header bar with Sender & Timestamp */}
+        <div
+          className={cn(
+            "mb-1 flex items-center gap-2 text-[11px] text-muted-foreground px-1",
+            isUser ? "flex-row-reverse" : "flex-row"
+          )}
+        >
+          <span className="font-medium text-foreground">
+            {isUser ? "You" : "Document Assistant"}
+          </span>
+
+          {!isUser && (
+            <span className="inline-flex items-center gap-1 rounded bg-muted/80 px-1.5 py-0.2 font-mono text-[9px] text-muted-foreground">
+              <Sparkles className="h-2.5 w-2.5 text-primary" />
+              Gemini 3 Flash
+            </span>
+          )}
+
+          {timeDisplay && (
+            <span
+              className="flex items-center gap-1 font-mono text-[10px] text-muted-foreground/75 cursor-default"
+              title={fullDateTimeDisplay}
+            >
+              <Clock className="h-2.5 w-2.5 opacity-60" />
+              {timeDisplay}
+            </span>
           )}
         </div>
 
-        {/* Verified Sources Pill List (Bottom of assistant answer) */}
-        {!isUser && message.citations && message.citations.length > 0 && (
-          <div className="mt-3.5 pt-3 border-t border-border/50">
-            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-              <ShieldCheck className="h-3.5 w-3.5 text-primary" />
-              <span>Verified Sources ({message.citations.length})</span>
-            </div>
-
-            <div className="flex flex-wrap gap-1.5">
-              {message.citations.map((c) => (
-                <button
-                  key={c.citation_index}
-                  type="button"
-                  onClick={() => onSelectCitation?.(c)}
-                  className="flex items-center gap-1.5 rounded-lg border border-border/70 bg-muted/40 px-2.5 py-1 text-left text-[11px] text-muted-foreground transition-all hover:border-primary/40 hover:bg-muted hover:text-foreground cursor-pointer"
-                  title={c.snippet || "View source excerpt"}
-                >
-                  <span className="font-mono text-[10px] font-bold text-primary">
-                    [^{c.citation_index}]
-                  </span>
-                  <span className="font-medium text-foreground">
-                    {c.ticker || "SEC"}
-                  </span>
-                  <span className="text-muted-foreground/80">
-                    FY{c.fiscal_year || "10-K"}
-                  </span>
-                  {c.is_table && (
-                    <FileSpreadsheet className="h-3 w-3 text-amber-500" />
-                  )}
-                  <ExternalLink className="h-2.5 w-2.5 opacity-60 ml-0.5" />
-                </button>
-              ))}
-            </div>
+        {/* Message Bubble */}
+        <div
+          className={cn(
+            "relative w-full rounded-2xl px-4 py-3 text-[13.5px] leading-relaxed tracking-normal shadow-xs",
+            isUser
+              ? "bg-primary text-primary-foreground"
+              : "border border-border/70 bg-card text-foreground"
+          )}
+        >
+          <div className="whitespace-pre-wrap break-words font-normal">
+            {renderFormattedContent(message.content)}
+            {!isUser && isStreamingLast && (
+              <span className="inline-block h-3.5 w-1.5 animate-pulse bg-foreground align-middle ml-1" />
+            )}
           </div>
-        )}
 
-        {/* Assistant Message Actions */}
-        {!isUser && message.content && (
-          <div className="mt-2.5 flex items-center justify-between border-t border-border/40 pt-2 text-[11px] text-muted-foreground">
-            <span className="font-mono text-[10px] text-muted-foreground/70">
-              {message.citations && message.citations.length > 0
-                ? "Grounded SEC 10-K Research"
-                : "Grounded Response"}
-            </span>
-            <button
-              type="button"
-              onClick={() => void handleCopy()}
-              className="flex items-center gap-1 rounded px-1.5 py-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              title="Copy message"
-            >
-              {copied ? (
-                <>
-                  <Check className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
-                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400">Copied</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="h-3 w-3" />
-                  <span className="text-[10px]">Copy</span>
-                </>
-              )}
-            </button>
-          </div>
-        )}
+          {/* Verified Sources Pill List (Bottom of assistant answer) */}
+          {!isUser && message.citations && message.citations.length > 0 && (
+            <div className="mt-3.5 pt-3 border-t border-border/50">
+              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                <ShieldCheck className="h-3.5 w-3.5 text-primary" />
+                <span>Verified Sources ({message.citations.length})</span>
+              </div>
+
+              <div className="flex flex-wrap gap-1.5">
+                {message.citations.map((c) => (
+                  <button
+                    key={c.citation_index}
+                    type="button"
+                    onClick={() => onSelectCitation?.(c)}
+                    className="flex items-center gap-1.5 rounded-lg border border-border/70 bg-muted/40 px-2.5 py-1 text-left text-[11px] text-muted-foreground transition-all hover:border-primary/40 hover:bg-muted hover:text-foreground cursor-pointer"
+                    title={c.snippet || "View source excerpt"}
+                  >
+                    <span className="font-mono text-[10px] font-bold text-primary">
+                      [^{c.citation_index}]
+                    </span>
+                    <span className="font-medium text-foreground">
+                      {c.ticker || "SEC"}
+                    </span>
+                    <span className="text-muted-foreground/80">
+                      FY{c.fiscal_year || "10-K"}
+                    </span>
+                    {c.is_table && (
+                      <FileSpreadsheet className="h-3 w-3 text-amber-500" />
+                    )}
+                    <ExternalLink className="h-2.5 w-2.5 opacity-60 ml-0.5" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Assistant Message Actions & Footer Timestamp */}
+          {!isUser && message.content && (
+            <div className="mt-2.5 flex items-center justify-between border-t border-border/40 pt-2 text-[11px] text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-[10px] text-muted-foreground/70">
+                  {message.citations && message.citations.length > 0
+                    ? "Grounded SEC 10-K Research"
+                    : "Grounded Response"}
+                </span>
+                {timeDisplay && (
+                  <span
+                    className="hidden sm:inline font-mono text-[9.5px] text-muted-foreground/60"
+                    title={fullDateTimeDisplay}
+                  >
+                    · {timeDisplay}
+                  </span>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => void handleCopy()}
+                className="flex items-center gap-1 rounded px-1.5 py-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground cursor-pointer"
+                title="Copy message to clipboard"
+              >
+                {copied ? (
+                  <>
+                    <Check className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400">Copied</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-3 w-3" />
+                    <span className="text-[10px]">Copy</span>
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
+      {/* User Avatar */}
       {isUser && (
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-border/80 bg-muted text-muted-foreground shadow-xs">
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-border/80 bg-muted text-muted-foreground shadow-xs mt-0.5">
           <User className="h-3.5 w-3.5" />
         </div>
       )}

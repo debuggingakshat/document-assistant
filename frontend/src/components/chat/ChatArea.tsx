@@ -5,6 +5,7 @@ import { MessageItem } from "@/components/chat/MessageItem"
 import { PipelineStatusIndicator } from "@/components/chat/PipelineStatusIndicator"
 import { SourcePassageDrawer } from "@/components/chat/SourcePassageDrawer"
 import type { Citation } from "@/lib/api"
+import { formatMessageDate, isDifferentDay } from "@/lib/dateUtils"
 import { useChatStream } from "@/lib/useChatStream"
 
 interface ChatAreaProps {
@@ -127,13 +128,29 @@ export function ChatArea({ threadId }: ChatAreaProps) {
                   isStreaming &&
                   idx === messages.length - 1 &&
                   message.role === "assistant"
+
+                const prevMessage = idx > 0 ? messages[idx - 1] : null
+                const showDateDivider =
+                  idx === 0 || isDifferentDay(prevMessage?.created_at, message.created_at)
+
                 return (
-                  <MessageItem
-                    key={message.id}
-                    message={message}
-                    isStreamingLast={isLastAssistant}
-                    onSelectCitation={(cit) => setSelectedCitation(cit)}
-                  />
+                  <div key={message.id}>
+                    {showDateDivider && message.created_at && (
+                      <div className="relative my-5 flex items-center justify-center">
+                        <div className="absolute inset-0 flex items-center">
+                          <div className="w-full border-t border-border/60" />
+                        </div>
+                        <span className="relative rounded-full border border-border/70 bg-card px-3 py-1 font-mono text-[10.5px] font-medium text-muted-foreground shadow-2xs">
+                          {formatMessageDate(message.created_at)}
+                        </span>
+                      </div>
+                    )}
+                    <MessageItem
+                      message={message}
+                      isStreamingLast={isLastAssistant}
+                      onSelectCitation={(cit) => setSelectedCitation(cit)}
+                    />
+                  </div>
                 )
               })}
 
