@@ -179,15 +179,26 @@ async def stream_orchestrated_turn(
     agent_override: Any | None = None,
     user_metadata: dict[str, Any] | None = None,
 ) -> AsyncIterator[str]:
-    """Execute turn with progressive live status updates and stream SSE events to frontend."""
+    """Execute turn with progressive technical status updates and stream SSE events to frontend."""
     retriever = retriever or Retriever()
     validator = validator or GroundingValidator(strict=True)
     agent = agent_override or create_document_agent()
 
-    # Step 1: Searching filings status
+    ticker, fiscal_year = _extract_ticker_and_fy(user_content)
+
+    # Step 1: Hybrid Retrieval
     yield format_ai_sdk_status_part(
         stage="searching",
-        message="Searching SEC 10-K filings with hybrid keyword & vector retrieval...",
+        title="Concurrent Hybrid Retrieval (FTS + pgvector)",
+        message="Embedding query via bge-base-en-v1.5 (768-d). Executing parallel tsvector FTS & pgvector cosine similarity search (<=>) in ThreadPoolExecutor...",
+        technical_details={
+            "embedding_model": "bge-base-en-v1.5 (MPS/CPU)",
+            "vector_dim": 768,
+            "fts_parser": "websearch_to_tsquery + ts_rank_cd",
+            "concurrency": "ThreadPoolExecutor (2 workers)",
+            "filter_ticker": ticker or "All Filings",
+            "filter_fy": fiscal_year or "All Years",
+        },
     )
 
     # 1. Persist user message
@@ -200,7 +211,6 @@ async def stream_orchestrated_turn(
     )
 
     # 2. Extract heuristics and run Phase 5 hybrid retrieval
-    ticker, fiscal_year = _extract_ticker_and_fy(user_content)
     logger.info(
         "Executing retrieval: query='%s', ticker=%s, fy=%s",
         user_content,
@@ -215,25 +225,54 @@ async def stream_orchestrated_turn(
         expand_neighbors=True,
     )
 
+    # Step 2: RRF Fusion & Expansion
+    yield format_ai_sdk_status_part(
+        stage="fusion",
+        title="Reciprocal Rank Fusion & Neighbor Expansion",
+        message=f"Fused candidates via RRF (k=60). Expanded context window with ±1 neighbor chunks across {len(initial_passages)} top passages...",
+        technical_details={
+            "algorithm": "Reciprocal Rank Fusion (k=60)",
+            "top_passages": len(initial_passages),
+            "context_expansion": "±1 neighbor chunks",
+            "storage": "Supabase PostgreSQL (pgvector + tsvector)",
+        },
+    )
+
     deps = DocumentAgentDeps(
         retriever=retriever,
         initial_passages=initial_passages,
     )
 
-    # Step 2: Gemini reasoning status
+    # Step 3: PydanticAI Reasoning
     yield format_ai_sdk_status_part(
         stage="reasoning",
-        message="Synthesizing answer with Gemini Flash & extracting metrics...",
+        title="PydanticAI Reasoning with Gemini Flash",
+        message="Injecting verified context window into Gemini system prompt. Synthesizing disclosures and extracting financial metrics under Meridian Research compliance directives...",
+        technical_details={
+            "orchestrator": "PydanticAI v2.52.0",
+            "llm": "gemini-3-flash-preview",
+            "system_prompt": "Meridian Research Trust Directives",
+            "compliance": "Strict corpus grounding, no non-causal speculation",
+        },
     )
 
     # 3. Run PydanticAI Gemini agent
     agent_result = await agent.run(user_content, deps=deps)
     grounded_answer: GroundedAnswer = agent_result.output
 
-    # Step 3: Grounding validation status
+    # Step 4: Grounding Validation
     yield format_ai_sdk_status_part(
         stage="validating",
-        message="Running 4-gate grounding safety checks on extracted citations...",
+        title="4-Gate Fail-Closed Grounding Verification",
+        message="Executing automated safety checks: UUID provenance, ticker consistency, regex marker synchronization (r'\\[\\^(\\d+)\\]'), and lexical snippet overlap...",
+        technical_details={
+            "validator": "GroundingValidator",
+            "gate_1": "UUID Provenance Check",
+            "gate_2": "Entity / Ticker Consistency",
+            "gate_3": "Footnote Marker Synchronization",
+            "gate_4": "Lexical Snippet Verification",
+            "policy": "Fail-Closed Strict Enforcement",
+        },
     )
 
     # 4. Enforce grounding verification
@@ -281,10 +320,16 @@ async def stream_orchestrated_turn(
 
     saved_citations = save_citations(client, asst_msg_id, citation_payloads)
 
-    # Step 4: Complete status
+    # Step 5: Complete status
     yield format_ai_sdk_status_part(
         stage="complete",
-        message="Grounding verified. Streaming answer...",
+        title="Pipeline Verified & Streaming",
+        message=f"Grounding verified ({len(val_result.verified_citations)} citations confirmed). Streaming tokens...",
+        technical_details={
+            "verified_citations": len(val_result.verified_citations),
+            "status": "passed" if val_result.is_valid else "flagged",
+            "protocol": "Vercel AI SDK SSE Data Stream",
+        },
     )
 
     # 7. Stream text response tokens

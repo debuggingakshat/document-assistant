@@ -172,7 +172,9 @@ export function useChatStream({ threadId }: UseChatStreamOptions) {
                     if (item.type === "status") {
                       setPipelineStatus({
                         stage: item.stage,
+                        title: item.title,
                         message: item.message,
+                        technical_details: item.technical_details,
                       })
                       if (item.stage === "complete") {
                         setTimeout(() => setPipelineStatus(null), 800)

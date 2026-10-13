@@ -45,8 +45,10 @@ export interface Message {
 }
 
 export interface PipelineStatus {
-  stage: "searching" | "reasoning" | "validating" | "complete" | string
+  stage: "searching" | "fusion" | "reasoning" | "validating" | "complete" | string
+  title?: string
   message: string
+  technical_details?: Record<string, any>
 }
 
 // ---------------------------------------------------------------------------

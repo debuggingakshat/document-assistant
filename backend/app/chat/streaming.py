@@ -21,15 +21,24 @@ def format_ai_sdk_data_part(data: Any) -> str:
     return f"2:[{json.dumps(data)}]\n"
 
 
-def format_ai_sdk_status_part(stage: str, message: str) -> str:
-    """Format pipeline progress status event for the frontend live indicator."""
-    return format_ai_sdk_data_part(
-        {
-            "type": "status",
-            "stage": stage,
-            "message": message,
-        }
-    )
+def format_ai_sdk_status_part(
+    stage: str,
+    message: str,
+    title: str | None = None,
+    technical_details: dict[str, Any] | None = None,
+) -> str:
+    """Format detailed pipeline progress status event for the frontend live indicator."""
+    payload: dict[str, Any] = {
+        "type": "status",
+        "stage": stage,
+        "message": message,
+    }
+    if title:
+        payload["title"] = title
+    if technical_details:
+        payload["technical_details"] = technical_details
+
+    return format_ai_sdk_data_part(payload)
 
 
 def format_ai_sdk_finish_part(finish_reason: str = "stop") -> str:
@@ -48,7 +57,6 @@ async def stream_stubbed_chat(
     user_metadata: dict[str, Any] | None = None,
 ) -> AsyncIterator[str]:
     """Persist user message, stream a stubbed assistant reply, and persist the assistant message."""
-    # 1. Persist the user message before starting assistant reply
     save_message(
         client=client,
         thread_id=thread_id,
@@ -64,9 +72,7 @@ async def stream_stubbed_chat(
         "apply hybrid search with Reciprocal Rank Fusion, and provide grounded answers with citations."
     )
 
-    # 2. Stream tokens in small chunks with realistic delay
     accumulated: list[str] = []
-    # Split by spaces while preserving spacing
     words = stubbed_reply.split(" ")
     for i, word in enumerate(words):
         chunk = word + (" " if i < len(words) - 1 else "")
@@ -74,10 +80,8 @@ async def stream_stubbed_chat(
         yield format_ai_sdk_text_part(chunk)
         await asyncio.sleep(0.02)
 
-    # 3. Yield the completion finish event
     yield format_ai_sdk_finish_part()
 
-    # 4. Persist the complete assistant message to chat_messages
     full_content = "".join(accumulated)
     save_message(
         client=client,
