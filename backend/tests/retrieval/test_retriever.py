@@ -3,6 +3,8 @@
 import uuid
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from app.retrieval.models import RetrievedChunk
 from app.retrieval.retriever import Retriever
 
@@ -123,3 +125,29 @@ def test_retriever_without_neighbor_expansion(
     p = results[0]
     assert p.full_context_text == candidate.chunk_text
     mock_fetch_neighbors.assert_not_called()
+
+
+@pytest.mark.anyio
+@patch("app.retrieval.retriever.search_keyword")
+@patch("app.retrieval.retriever.search_semantic")
+async def test_retriever_async_flow(
+    mock_search_sem: MagicMock,
+    mock_search_kw: MagicMock,
+) -> None:
+    """Retriever.retrieve_async executes asynchronously and returns expected passages."""
+    doc_id = uuid.uuid4()
+    candidate = _sample_chunk(doc_id=doc_id, chunk_index=5)
+    mock_search_sem.return_value = [candidate]
+    mock_search_kw.return_value = [candidate]
+
+    mock_engine = MagicMock()
+    mock_conn = MagicMock()
+    mock_engine.connect.return_value.__enter__.return_value = mock_conn
+
+    retriever = Retriever(embedder=MockEmbedder(), engine=mock_engine)
+    results = await retriever.retrieve_async(
+        query="Apple revenue 2024",
+        expand_neighbors=False,
+    )
+    assert len(results) == 1
+    assert results[0].ticker == "AAPL"

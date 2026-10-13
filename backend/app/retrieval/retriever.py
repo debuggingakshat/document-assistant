@@ -1,12 +1,13 @@
 """High-level Retriever service combining embedding, hybrid search, RRF, and neighbor expansion."""
 
+import concurrent.futures
 import logging
 
 from sqlalchemy import Engine, create_engine
 
 from app.config import settings
 from app.retrieval.fusion import reciprocal_rank_fusion
-from app.retrieval.models import FusedChunk, RetrievedPassage
+from app.retrieval.models import FusedChunk, RetrievedChunk, RetrievedPassage
 from app.retrieval.queries import fetch_neighbor_chunks, search_keyword, search_semantic
 from ingest.embedder import LocalEmbedder
 
@@ -29,15 +30,17 @@ def get_default_engine() -> Engine:
 
 
 class Retriever:
-    """Hybrid search retriever over SEC 10-K document chunks."""
+    """Hybrid search retriever over SEC 10-K document chunks with concurrent branch execution."""
 
     def __init__(
         self,
         embedder: LocalEmbedder | None = None,
         engine: Engine | None = None,
+        max_workers: int = 2,
     ) -> None:
         self.embedder = embedder or LocalEmbedder()
         self.engine = engine or get_default_engine()
+        self.max_workers = max_workers
 
     def retrieve(
         self,
@@ -48,7 +51,10 @@ class Retriever:
         candidate_limit: int = 20,
         expand_neighbors: bool = True,
     ) -> list[RetrievedPassage]:
-        """Perform end-to-end hybrid retrieval with RRF and optional neighbor expansion.
+        """Perform end-to-end hybrid retrieval with concurrent branches, RRF, and neighbor expansion.
+
+        Runs full-text keyword search and semantic embedding + vector search concurrently
+        to minimize total latency.
 
         Args:
             query: User's natural language question or search phrase.
@@ -65,39 +71,50 @@ class Retriever:
         if not clean_query:
             return []
 
-        # 1. Embed query vector locally ($0.00, MPS / CPU)
-        query_vec = self.embedder.embed_text(clean_query)
+        def _run_keyword_branch() -> list[RetrievedChunk]:
+            with self.engine.connect() as conn:
+                return search_keyword(
+                    conn=conn,
+                    query_text=clean_query,
+                    ticker=ticker,
+                    fiscal_year=fiscal_year,
+                    limit=candidate_limit,
+                )
 
-        # 2. Execute parallel branches in database
+        def _run_semantic_branch() -> list[RetrievedChunk]:
+            # Local query embedding (MPS/CPU) runs concurrently with keyword I/O
+            query_vec = self.embedder.embed_text(clean_query)
+            with self.engine.connect() as conn:
+                return search_semantic(
+                    conn=conn,
+                    query_embedding=query_vec,
+                    ticker=ticker,
+                    fiscal_year=fiscal_year,
+                    limit=candidate_limit,
+                )
+
+        # 1. Execute keyword search and semantic search concurrently
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=self.max_workers
+        ) as executor:
+            fut_keyword = executor.submit(_run_keyword_branch)
+            fut_semantic = executor.submit(_run_semantic_branch)
+            keyword_candidates = fut_keyword.result()
+            semantic_candidates = fut_semantic.result()
+
+        # 2. Fuse branches with Reciprocal Rank Fusion
+        fused_candidates: list[FusedChunk] = reciprocal_rank_fusion(
+            semantic_results=semantic_candidates,
+            keyword_results=keyword_candidates,
+            top_n=top_n,
+        )
+
+        if not fused_candidates:
+            return []
+
+        # 3. Optional neighbor chunk context expansion
+        passages: list[RetrievedPassage] = []
         with self.engine.connect() as conn:
-            semantic_candidates = search_semantic(
-                conn=conn,
-                query_embedding=query_vec,
-                ticker=ticker,
-                fiscal_year=fiscal_year,
-                limit=candidate_limit,
-            )
-
-            keyword_candidates = search_keyword(
-                conn=conn,
-                query_text=clean_query,
-                ticker=ticker,
-                fiscal_year=fiscal_year,
-                limit=candidate_limit,
-            )
-
-            # 3. Fuse branches with Reciprocal Rank Fusion
-            fused_candidates: list[FusedChunk] = reciprocal_rank_fusion(
-                semantic_results=semantic_candidates,
-                keyword_results=keyword_candidates,
-                top_n=top_n,
-            )
-
-            if not fused_candidates:
-                return []
-
-            # 4. Optional neighbor chunk context expansion
-            passages: list[RetrievedPassage] = []
             for item in fused_candidates:
                 chunk = item.chunk
                 meta = chunk.metadata or {}
@@ -165,3 +182,25 @@ class Retriever:
             fiscal_year,
         )
         return passages
+
+    async def retrieve_async(
+        self,
+        query: str,
+        ticker: str | None = None,
+        fiscal_year: int | None = None,
+        top_n: int = 5,
+        candidate_limit: int = 20,
+        expand_neighbors: bool = True,
+    ) -> list[RetrievedPassage]:
+        """Asynchronous wrapper for retrieve() to prevent event loop blocking."""
+        import asyncio
+
+        return await asyncio.to_thread(
+            self.retrieve,
+            query=query,
+            ticker=ticker,
+            fiscal_year=fiscal_year,
+            top_n=top_n,
+            candidate_limit=candidate_limit,
+            expand_neighbors=expand_neighbors,
+        )
