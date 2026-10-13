@@ -18,12 +18,35 @@ export interface Thread {
   updated_at: string
 }
 
+export interface Citation {
+  id?: string
+  chunk_id: string
+  citation_index: number
+  ticker?: string | null
+  company_name?: string | null
+  fiscal_year?: number | null
+  filing_type?: string | null
+  filing_date?: string | null
+  section?: string | null
+  page?: number | null
+  snippet?: string | null
+  excerpt?: string | null
+  full_context_text?: string | null
+  is_table?: boolean
+}
+
 export interface Message {
   id: string
   thread_id: string
   role: "user" | "assistant"
   content: string
   created_at: string
+  citations?: Citation[]
+}
+
+export interface PipelineStatus {
+  stage: "searching" | "reasoning" | "validating" | "complete" | string
+  message: string
 }
 
 // ---------------------------------------------------------------------------
@@ -53,6 +76,11 @@ export function updateThread(threadId: string, title: string): Promise<Thread> {
 /** Delete a chat thread and all its messages. */
 export function deleteThread(threadId: string): Promise<void> {
   return http.delete<void>(`/threads/${threadId}`)
+}
+
+/** Fetch stored citations for an assistant message. */
+export function listMessageCitations(messageId: string): Promise<Citation[]> {
+  return http.get<Citation[]>(`/messages/${messageId}/citations`)
 }
 
 // ---------------------------------------------------------------------------

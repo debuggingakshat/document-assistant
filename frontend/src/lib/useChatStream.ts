@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useState } from "react"
-import { listMessages, type Message } from "@/lib/api"
+import {
+  listMessageCitations,
+  listMessages,
+  type Citation,
+  type Message,
+  type PipelineStatus,
+} from "@/lib/api"
 import { env } from "@/lib/env"
 import { getAccessToken } from "@/lib/supabase"
 
@@ -11,6 +17,7 @@ export function useChatStream({ threadId }: UseChatStreamOptions) {
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isStreaming, setIsStreaming] = useState(false)
+  const [pipelineStatus, setPipelineStatus] = useState<PipelineStatus | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   // Load message history when threadId changes
@@ -20,11 +27,29 @@ export function useChatStream({ threadId }: UseChatStreamOptions) {
     }
 
     let isMounted = true
+    setIsLoading(true)
 
     listMessages(threadId)
-      .then((history) => {
+      .then(async (history) => {
+        if (!isMounted) return
+
+        // For assistant messages, load stored citations if available
+        const enriched = await Promise.all(
+          history.map(async (msg) => {
+            if (msg.role === "assistant") {
+              try {
+                const cits = await listMessageCitations(msg.id)
+                return { ...msg, citations: cits }
+              } catch {
+                return msg
+              }
+            }
+            return msg
+          })
+        )
+
         if (isMounted) {
-          setMessages(history)
+          setMessages(enriched)
           setIsLoading(false)
           setError(null)
         }
@@ -47,6 +72,10 @@ export function useChatStream({ threadId }: UseChatStreamOptions) {
       if (!trimmed || !threadId || isStreaming) return
 
       setError(null)
+      setPipelineStatus({
+        stage: "searching",
+        message: "Searching SEC 10-K filings with hybrid keyword & vector retrieval...",
+      })
 
       const userMessageId = `user-${Date.now()}`
       const assistantMessageId = `assistant-${Date.now()}`
@@ -65,6 +94,7 @@ export function useChatStream({ threadId }: UseChatStreamOptions) {
         role: "assistant",
         content: "",
         created_at: new Date().toISOString(),
+        citations: [],
       }
 
       setMessages((prev) => [...prev, userMsg, initialAssistantMsg])
@@ -109,14 +139,12 @@ export function useChatStream({ threadId }: UseChatStreamOptions) {
 
           buffer += decoder.decode(value, { stream: true })
           const lines = buffer.split("\n")
-          // Keep whatever is after the last newline in the buffer
           buffer = lines.pop() ?? ""
 
           for (const line of lines) {
             if (!line) continue
 
-            // AI SDK data stream format:
-            // 0:"text chunk"\n
+            // 0: Text chunks
             if (line.startsWith("0:")) {
               try {
                 const textChunk = JSON.parse(line.slice(2)) as string
@@ -131,7 +159,42 @@ export function useChatStream({ threadId }: UseChatStreamOptions) {
                   )
                 )
               } catch {
-                // If chunk JSON parse fails, ignore malformed line
+                // Ignore parse failures
+              }
+            }
+
+            // 2: Structured metadata events (status, citations)
+            else if (line.startsWith("2:")) {
+              try {
+                const dataArr = JSON.parse(line.slice(2))
+                if (Array.isArray(dataArr)) {
+                  for (const item of dataArr) {
+                    if (item.type === "status") {
+                      setPipelineStatus({
+                        stage: item.stage,
+                        message: item.message,
+                      })
+                      if (item.stage === "complete") {
+                        setTimeout(() => setPipelineStatus(null), 800)
+                      }
+                    } else if (item.type === "citations") {
+                      const cits = item.citations as Citation[]
+                      setMessages((prev) =>
+                        prev.map((m) =>
+                          m.id === assistantMessageId
+                            ? {
+                                ...m,
+                                id: item.messageId || m.id,
+                                citations: cits,
+                              }
+                            : m
+                        )
+                      )
+                    }
+                  }
+                }
+              } catch {
+                // Ignore parse failures
               }
             }
           }
@@ -139,12 +202,12 @@ export function useChatStream({ threadId }: UseChatStreamOptions) {
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : "Failed to send message"
         setError(errMsg)
-        // Remove or update the empty assistant message on error
         setMessages((prev) =>
           prev.filter((m) => m.id !== assistantMessageId || m.content.length > 0)
         )
       } finally {
         setIsStreaming(false)
+        setPipelineStatus(null)
       }
     },
     [threadId, isStreaming]
@@ -154,6 +217,7 @@ export function useChatStream({ threadId }: UseChatStreamOptions) {
     messages,
     isLoading,
     isStreaming,
+    pipelineStatus,
     error,
     sendMessage,
   }

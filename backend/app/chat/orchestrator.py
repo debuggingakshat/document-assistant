@@ -12,7 +12,11 @@ from supabase import Client
 
 from app.assistant.agent import DocumentAgentDeps, create_document_agent
 from app.assistant.schemas import GroundedAnswer
-from app.chat.streaming import format_ai_sdk_finish_part, format_ai_sdk_text_part
+from app.chat.streaming import (
+    format_ai_sdk_finish_part,
+    format_ai_sdk_status_part,
+    format_ai_sdk_text_part,
+)
 from app.database.chats import save_citations, save_message
 from app.grounding.validator import GroundingValidator, ValidationResult
 from app.retrieval.models import RetrievedPassage
@@ -175,34 +179,155 @@ async def stream_orchestrated_turn(
     agent_override: Any | None = None,
     user_metadata: dict[str, Any] | None = None,
 ) -> AsyncIterator[str]:
-    """Execute turn and stream SSE events (AI SDK format) to the frontend client."""
-    # Execute turn orchestration
-    result = await orchestrate_turn(
-        client=client,
-        thread_id=thread_id,
-        user_content=user_content,
-        retriever=retriever,
-        validator=validator,
-        agent_override=agent_override,
-        user_metadata=user_metadata,
+    """Execute turn with progressive live status updates and stream SSE events to frontend."""
+    retriever = retriever or Retriever()
+    validator = validator or GroundingValidator(strict=True)
+    agent = agent_override or create_document_agent()
+
+    # Step 1: Searching filings status
+    yield format_ai_sdk_status_part(
+        stage="searching",
+        message="Searching SEC 10-K filings with hybrid keyword & vector retrieval...",
     )
 
-    # 1. Stream the text response in token chunks
-    words = result.answer.answer.split(" ")
+    # 1. Persist user message
+    user_msg = save_message(
+        client=client,
+        thread_id=thread_id,
+        role="user",
+        content=user_content,
+        ai_sdk_metadata=user_metadata,
+    )
+
+    # 2. Extract heuristics and run Phase 5 hybrid retrieval
+    ticker, fiscal_year = _extract_ticker_and_fy(user_content)
+    logger.info(
+        "Executing retrieval: query='%s', ticker=%s, fy=%s",
+        user_content,
+        ticker,
+        fiscal_year,
+    )
+    initial_passages = retriever.retrieve(
+        query=user_content,
+        ticker=ticker,
+        fiscal_year=fiscal_year,
+        top_n=5,
+        expand_neighbors=True,
+    )
+
+    deps = DocumentAgentDeps(
+        retriever=retriever,
+        initial_passages=initial_passages,
+    )
+
+    # Step 2: Gemini reasoning status
+    yield format_ai_sdk_status_part(
+        stage="reasoning",
+        message="Synthesizing answer with Gemini Flash & extracting metrics...",
+    )
+
+    # 3. Run PydanticAI Gemini agent
+    agent_result = await agent.run(user_content, deps=deps)
+    grounded_answer: GroundedAnswer = agent_result.output
+
+    # Step 3: Grounding validation status
+    yield format_ai_sdk_status_part(
+        stage="validating",
+        message="Running 4-gate grounding safety checks on extracted citations...",
+    )
+
+    # 4. Enforce grounding verification
+    val_result: ValidationResult = validator.validate(
+        answer=grounded_answer,
+        retrieved_passages=deps.all_retrieved_passages,
+    )
+
+    final_answer_text = grounded_answer.answer
+    if not val_result.is_valid:
+        warning_msg = (
+            "\n\n> [!WARNING]\n"
+            "> **Grounding Verification Alert**: Some citations in this response could not be verified "
+            "against the ingested corpus. Unverified claims have been flagged."
+        )
+        final_answer_text += warning_msg
+
+    # 5. Persist assistant message
+    asst_msg = save_message(
+        client=client,
+        thread_id=thread_id,
+        role="assistant",
+        content=final_answer_text,
+    )
+    asst_msg_id = uuid.UUID(str(asst_msg["id"]))
+
+    # 6. Persist citations in message_citations
+    citation_payloads: list[dict[str, Any]] = []
+    passage_by_id = {p.chunk_id: p for p in deps.all_retrieved_passages}
+
+    for idx, cit in enumerate(val_result.verified_citations, start=1):
+        p = passage_by_id.get(cit.chunk_id)
+        citation_payloads.append(
+            {
+                "chunk_id": cit.chunk_id,
+                "citation_index": idx,
+                "ticker": cit.ticker or (p.ticker if p else None),
+                "filing_type": p.filing_type if p else "10-K",
+                "filing_date": p.filing_date if p else None,
+                "section": cit.section
+                or (" > ".join(p.headings) if p and p.headings else None),
+                "snippet": cit.snippet or (p.text[:200] if p else None),
+            }
+        )
+
+    saved_citations = save_citations(client, asst_msg_id, citation_payloads)
+
+    # Step 4: Complete status
+    yield format_ai_sdk_status_part(
+        stage="complete",
+        message="Grounding verified. Streaming answer...",
+    )
+
+    # 7. Stream text response tokens
+    words = final_answer_text.split(" ")
     for i, word in enumerate(words):
         chunk = word + (" " if i < len(words) - 1 else "")
         yield format_ai_sdk_text_part(chunk)
         await asyncio.sleep(0.01)
 
-    # 2. Yield citation metadata part for the UI
-    if result.citations_saved:
+    # 8. Yield enriched citation metadata part for UI drawer & badges
+    if saved_citations:
+        enriched_citations = []
+        for cit in saved_citations:
+            cid_str = str(cit.get("chunk_id"))
+            try:
+                cid = uuid.UUID(cid_str)
+            except ValueError:
+                cid = None
+            p = passage_by_id.get(cid) if cid else None
+
+            enriched_citations.append(
+                {
+                    "id": str(cit.get("id", uuid.uuid4())),
+                    "chunk_id": cid_str,
+                    "citation_index": cit.get("citation_index", 1),
+                    "ticker": cit.get("ticker") or (p.ticker if p else ""),
+                    "company_name": p.company_name if p else "",
+                    "fiscal_year": p.fiscal_year if p else None,
+                    "filing_type": cit.get("filing_type", "10-K"),
+                    "filing_date": cit.get("filing_date"),
+                    "section": cit.get("section") or "",
+                    "snippet": cit.get("excerpt") or cit.get("snippet") or (p.text[:200] if p else ""),
+                    "full_context_text": p.full_context_text if p else "",
+                    "is_table": p.is_table if p else False,
+                }
+            )
+
         citation_data = {
             "type": "citations",
-            "messageId": str(result.assistant_message_id),
-            "citations": result.citations_saved,
+            "messageId": str(asst_msg_id),
+            "citations": enriched_citations,
         }
-        # Format as AI SDK data part (prefix 2:)
         yield f"2:[{json.dumps(citation_data)}]\n"
 
-    # 3. Finish stream
+    # 9. Finish stream
     yield format_ai_sdk_finish_part()

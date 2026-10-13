@@ -1,7 +1,10 @@
-import { useEffect, useRef } from "react"
-import { ArrowUpRight, FileText, ShieldAlert, Sparkles, TrendingUp } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
+import { ArrowUpRight, Cpu, FileText, Sparkles, TrendingUp } from "lucide-react"
 import { MessageInput } from "@/components/chat/MessageInput"
 import { MessageItem } from "@/components/chat/MessageItem"
+import { PipelineStatusIndicator } from "@/components/chat/PipelineStatusIndicator"
+import { SourcePassageDrawer } from "@/components/chat/SourcePassageDrawer"
+import type { Citation } from "@/lib/api"
 import { useChatStream } from "@/lib/useChatStream"
 
 interface ChatAreaProps {
@@ -10,33 +13,34 @@ interface ChatAreaProps {
 
 const STARTER_PROMPTS = [
   {
-    category: "Financial Performance",
+    category: "Apple Financial Performance",
     icon: TrendingUp,
-    question: "What were Apple's total net sales and operating income in the latest fiscal year?",
-    tag: "10-K Item 7",
+    question: "What were Apple's net sales for iPhone and Services in fiscal 2024?",
+    tag: "AAPL FY2024 10-K",
   },
   {
-    category: "Risk Disclosures",
-    icon: ShieldAlert,
-    question: "Summarize the key supply chain and regulatory risk factors disclosed in Item 1A.",
-    tag: "10-K Item 1A",
-  },
-  {
-    category: "Segment & Margins",
+    category: "Amazon GenAI & Margins",
     icon: FileText,
-    question: "Explain the revenue breakdown between Products and Services over recent periods.",
-    tag: "10-Q Notes",
+    question: "Did generative AI improve operating margins for Amazon in 2023?",
+    tag: "AMZN FY2023 10-K",
+  },
+  {
+    category: "Nvidia Data Center Growth",
+    icon: Cpu,
+    question: "What drove Nvidia's Data Center revenue growth in fiscal 2024?",
+    tag: "NVDA FY2024 10-K",
   },
 ]
 
 export function ChatArea({ threadId }: ChatAreaProps) {
-  const { messages, isLoading, isStreaming, error, sendMessage } =
+  const { messages, isLoading, isStreaming, pipelineStatus, error, sendMessage } =
     useChatStream({ threadId })
+  const [selectedCitation, setSelectedCitation] = useState<Citation | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages, isStreaming])
+  }, [messages, isStreaming, pipelineStatus])
 
   return (
     <div className="flex h-screen flex-1 flex-col overflow-hidden bg-background">
@@ -56,7 +60,7 @@ export function ChatArea({ threadId }: ChatAreaProps) {
 
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <span className="hidden sm:inline rounded-full border border-border/60 bg-card px-2.5 py-1 text-[11px] font-medium text-foreground">
-            Corpus: 10-K & 10-Q
+            Corpus: SEC 10-K Filings
           </span>
         </div>
       </header>
@@ -67,7 +71,7 @@ export function ChatArea({ threadId }: ChatAreaProps) {
           {isLoading ? (
             <div className="flex h-64 flex-col items-center justify-center gap-2 text-xs text-muted-foreground">
               <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              <span>Loading conversation history...</span>
+              <span>Loading conversation history & citations...</span>
             </div>
           ) : messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -90,7 +94,7 @@ export function ChatArea({ threadId }: ChatAreaProps) {
                       key={item.category}
                       type="button"
                       onClick={() => void sendMessage(item.question)}
-                      className="group flex flex-col justify-between rounded-xl border border-border/70 bg-card p-3.5 text-left shadow-2xs transition-all hover:border-foreground/30 hover:shadow-xs"
+                      className="group flex flex-col justify-between rounded-xl border border-border/70 bg-card p-3.5 text-left shadow-2xs transition-all hover:border-foreground/30 hover:shadow-xs cursor-pointer"
                     >
                       <div>
                         <div className="flex items-center justify-between text-muted-foreground">
@@ -128,9 +132,15 @@ export function ChatArea({ threadId }: ChatAreaProps) {
                     key={message.id}
                     message={message}
                     isStreamingLast={isLastAssistant}
+                    onSelectCitation={(cit) => setSelectedCitation(cit)}
                   />
                 )
               })}
+
+              {/* Live Pipeline Progress Indicator */}
+              {isStreaming && pipelineStatus && (
+                <PipelineStatusIndicator status={pipelineStatus} />
+              )}
             </div>
           )}
 
@@ -147,6 +157,12 @@ export function ChatArea({ threadId }: ChatAreaProps) {
 
       {/* Input Dock */}
       <MessageInput onSend={sendMessage} disabled={isStreaming} />
+
+      {/* Source Passage Inspection Drawer */}
+      <SourcePassageDrawer
+        citation={selectedCitation}
+        onClose={() => setSelectedCitation(null)}
+      />
     </div>
   )
 }

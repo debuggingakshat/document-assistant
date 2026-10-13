@@ -1,4 +1,4 @@
-"""Streaming utilities and stubbed response generation for AI SDK."""
+"""Streaming utilities and response generation for AI SDK."""
 
 import asyncio
 import json
@@ -12,12 +12,28 @@ from app.database.chats import save_message
 
 
 def format_ai_sdk_text_part(delta: str) -> str:
-    """Format a text delta into an AI SDK data stream line."""
+    """Format a text delta into an AI SDK data stream line (prefix 0:)."""
     return f"0:{json.dumps(delta)}\n"
 
 
+def format_ai_sdk_data_part(data: Any) -> str:
+    """Format arbitrary structured data into an AI SDK data stream line (prefix 2:)."""
+    return f"2:[{json.dumps(data)}]\n"
+
+
+def format_ai_sdk_status_part(stage: str, message: str) -> str:
+    """Format pipeline progress status event for the frontend live indicator."""
+    return format_ai_sdk_data_part(
+        {
+            "type": "status",
+            "stage": stage,
+            "message": message,
+        }
+    )
+
+
 def format_ai_sdk_finish_part(finish_reason: str = "stop") -> str:
-    """Format a finish part into an AI SDK data stream line."""
+    """Format a finish part into an AI SDK data stream line (prefix d:)."""
     payload = {
         "finishReason": finish_reason,
         "usage": {"promptTokens": 0, "completionTokens": 0},
