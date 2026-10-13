@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import {
   Brain,
   CheckCircle2,
@@ -8,7 +8,6 @@ import {
   Layers,
   Search,
   ShieldCheck,
-  Sparkles,
   Terminal,
 } from "lucide-react"
 import type { PipelineStatus } from "@/lib/api"
@@ -18,39 +17,14 @@ interface PipelineStatusIndicatorProps {
   status: PipelineStatus | null
 }
 
-const STAGES = [
-  {
-    id: "searching",
-    label: "Hybrid Retrieval",
-    sublabel: "FTS + Vector (768-d)",
-    icon: Search,
-  },
-  {
-    id: "fusion",
-    label: "RRF Fusion",
-    sublabel: "RRF k=60 + ±1 Chunks",
-    icon: Layers,
-  },
-  {
-    id: "reasoning",
-    label: "Agent Synthesis",
-    sublabel: "PydanticAI + Gemini Flash",
-    icon: Brain,
-  },
-  {
-    id: "validating",
-    label: "4-Gate Grounding",
-    sublabel: "Fail-Closed Verification",
-    icon: ShieldCheck,
-  },
-]
-
-export function PipelineStatusIndicator({ status }: PipelineStatusIndicatorProps) {
+export function PipelineStatusIndicator({
+  status,
+}: PipelineStatusIndicatorProps) {
   const [showTechnicalTrace, setShowTechnicalTrace] = useState(false)
 
   if (!status) return null
 
-  const stage = status.stage.toLowerCase()
+  const stage = status.stage
 
   // Map stage to index
   let activeIdx = 0
@@ -63,17 +37,73 @@ export function PipelineStatusIndicator({ status }: PipelineStatusIndicatorProps
   const details = status.technical_details || {}
   const hasDetails = Object.keys(details).length > 0
 
+  const activeModelRaw =
+    (details.llm as string) ||
+    (typeof window !== "undefined"
+      ? localStorage.getItem("selected_llm_model")
+      : null) ||
+    "gemini-2.5-flash"
+
+  const activeModelLabel = useMemo(() => {
+    if (activeModelRaw === "gemini-2.5-pro") return "Gemini 2.5 Pro"
+    if (activeModelRaw === "gemini-2.0-flash-lite") return "Gemini 2.0 Flash Lite"
+    if (activeModelRaw === "gemini-2.5-flash") return "Gemini 2.5 Flash"
+    return "Gemini 2.5 Flash"
+  }, [activeModelRaw])
+
+  const stages = useMemo(
+    () => [
+      {
+        id: "searching",
+        label: "Hybrid Retrieval",
+        sublabel: "FTS + Vector (768-d)",
+        icon: Search,
+      },
+      {
+        id: "fusion",
+        label: "RRF Fusion",
+        sublabel: "RRF k=60 + ±1 Chunks",
+        icon: Layers,
+      },
+      {
+        id: "reasoning",
+        label: "Agent Synthesis",
+        sublabel: `PydanticAI + ${activeModelLabel}`,
+        icon: Brain,
+      },
+      {
+        id: "validating",
+        label: "4-Gate Grounding",
+        sublabel: "Fail-Closed Verification",
+        icon: ShieldCheck,
+      },
+    ],
+    [activeModelLabel]
+  )
+
   return (
-    <div className="my-3 overflow-hidden rounded-2xl border border-primary/25 bg-card/90 p-4 shadow-sm backdrop-blur-md transition-all animate-in fade-in slide-in-from-bottom-2">
+    <div id="pipeline-telemetry-card" className="my-3 overflow-hidden rounded-2xl border border-primary/25 bg-card/90 p-4 shadow-sm backdrop-blur-md transition-all animate-in fade-in slide-in-from-bottom-2">
       {/* Top Header */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3">
-          <div className="relative mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary shadow-xs">
-            {stage === "searching" && <Search className="h-4 w-4 animate-pulse" />}
-            {stage === "fusion" && <Layers className="h-4 w-4 animate-bounce" />}
-            {stage === "reasoning" && <Sparkles className="h-4 w-4 animate-spin" />}
-            {stage === "validating" && <ShieldCheck className="h-4 w-4 animate-pulse" />}
-            {stage === "complete" && <CheckCircle2 className="h-4 w-4 text-emerald-500" />}
+          {/* Meridian Research Logo while generating response */}
+          <div className="relative mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl border border-border/70 bg-card p-1 shadow-xs">
+            <img
+              src="/meridian-emblem-light.png"
+              alt="Meridian Research"
+              className={cn(
+                "size-5 object-contain dark:hidden",
+                stage !== "complete" && "animate-pulse"
+              )}
+            />
+            <img
+              src="/meridian-emblem-dark.png"
+              alt="Meridian Research"
+              className={cn(
+                "size-5 object-contain hidden dark:block",
+                stage !== "complete" && "animate-pulse"
+              )}
+            />
           </div>
 
           <div>
@@ -85,7 +115,7 @@ export function PipelineStatusIndicator({ status }: PipelineStatusIndicatorProps
                     : stage === "fusion"
                     ? "Reciprocal Rank Fusion & Neighbor Expansion"
                     : stage === "reasoning"
-                    ? "PydanticAI Agent Reasoning & Synthesis"
+                    ? `PydanticAI Reasoning with ${activeModelLabel}`
                     : stage === "validating"
                     ? "4-Gate Fail-Closed Grounding Verification"
                     : "Pipeline Execution Complete"
@@ -110,7 +140,7 @@ export function PipelineStatusIndicator({ status }: PipelineStatusIndicatorProps
 
       {/* 4-Step Technical Stepper */}
       <div className="mt-3.5 grid grid-cols-2 gap-2 sm:grid-cols-4 border-t border-border/50 pt-3">
-        {STAGES.map((s, idx) => {
+        {stages.map((s, idx) => {
           const Icon = s.icon
           const isDone = activeIdx > idx
           const isCurrent = activeIdx === idx
@@ -181,7 +211,7 @@ export function PipelineStatusIndicator({ status }: PipelineStatusIndicatorProps
         </button>
 
         <span className="font-mono text-[10px] text-muted-foreground/60">
-          Supabase pgvector · Gemini 3 Flash
+          Supabase pgvector · {activeModelLabel}
         </span>
       </div>
 
@@ -203,7 +233,7 @@ export function PipelineStatusIndicator({ status }: PipelineStatusIndicatorProps
               • <strong className="text-foreground">Fusion Algorithm</strong>: Reciprocal Rank Fusion (<span className="text-primary">RRF k=60</span>) with boundary context expansion
             </li>
             <li>
-              • <strong className="text-foreground">Reasoning Engine</strong>: <span className="text-primary">PydanticAI Agent</span> via Google AI Studio Gemini Flash Preview
+              • <strong className="text-foreground">Reasoning Engine</strong>: <span className="text-primary">PydanticAI Agent</span> via Google AI Studio ({activeModelLabel})
             </li>
             <li>
               • <strong className="text-foreground">Safety Contract</strong>: Meridian Research <span className="text-primary">4-Gate Fail-Closed GroundingValidator</span>

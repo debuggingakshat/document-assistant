@@ -14,8 +14,16 @@ import { http } from "@/lib/http"
 export interface Thread {
   id: string
   title: string | null
+  is_pinned?: boolean
+  is_archived?: boolean
   created_at: string
   updated_at: string
+}
+
+export interface UpdateThreadPayload {
+  title?: string
+  is_pinned?: boolean
+  is_archived?: boolean
 }
 
 export interface Citation {
@@ -42,6 +50,7 @@ export interface Message {
   content: string
   created_at: string
   citations?: Citation[]
+  ai_sdk_metadata?: Record<string, any>
 }
 
 export interface PipelineStatus {
@@ -56,8 +65,9 @@ export interface PipelineStatus {
 // ---------------------------------------------------------------------------
 
 /** List all chat threads belonging to the authenticated user. */
-export function listThreads(): Promise<Thread[]> {
-  return http.get<Thread[]>("/threads")
+export function listThreads(archived = false): Promise<Thread[]> {
+  const query = archived ? "?archived=true" : ""
+  return http.get<Thread[]>(`/threads${query}`)
 }
 
 /** Create a new chat thread. */
@@ -71,8 +81,12 @@ export function listMessages(threadId: string): Promise<Message[]> {
 }
 
 /** Rename an existing chat thread. */
-export function updateThread(threadId: string, title: string): Promise<Thread> {
-  return http.patch<Thread>(`/threads/${threadId}`, { title })
+export function updateThread(
+  threadId: string,
+  payload: string | UpdateThreadPayload
+): Promise<Thread> {
+  const body = typeof payload === "string" ? { title: payload } : payload
+  return http.patch<Thread>(`/threads/${threadId}`, body)
 }
 
 /** Delete a chat thread and all its messages. */

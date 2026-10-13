@@ -67,7 +67,11 @@ export function useChatStream({ threadId }: UseChatStreamOptions) {
   }, [threadId])
 
   const sendMessage = useCallback(
-    async (content: string) => {
+    async (
+      content: string,
+      modelOverride?: string,
+      options?: { parentUserMessageId?: string }
+    ) => {
       const trimmed = content.trim()
       if (!trimmed || !threadId || isStreaming) return
 
@@ -77,16 +81,9 @@ export function useChatStream({ threadId }: UseChatStreamOptions) {
         message: "Searching SEC 10-K filings with hybrid keyword & vector retrieval...",
       })
 
-      const userMessageId = `user-${Date.now()}`
+      const parentUserMessageId = options?.parentUserMessageId
+      const userMessageId = parentUserMessageId || `user-${Date.now()}`
       const assistantMessageId = `assistant-${Date.now()}`
-
-      const userMsg: Message = {
-        id: userMessageId,
-        thread_id: threadId,
-        role: "user",
-        content: trimmed,
-        created_at: new Date().toISOString(),
-      }
 
       const initialAssistantMsg: Message = {
         id: assistantMessageId,
@@ -95,9 +92,25 @@ export function useChatStream({ threadId }: UseChatStreamOptions) {
         content: "",
         created_at: new Date().toISOString(),
         citations: [],
+        ai_sdk_metadata: {
+          parent_user_message_id: parentUserMessageId,
+          model: modelOverride || localStorage.getItem("selected_llm_model") || "gemini-2.5-flash",
+        },
       }
 
-      setMessages((prev) => [...prev, userMsg, initialAssistantMsg])
+      if (parentUserMessageId) {
+        // Regeneration turn: append new assistant version under the existing user prompt
+        setMessages((prev) => [...prev, initialAssistantMsg])
+      } else {
+        const userMsg: Message = {
+          id: userMessageId,
+          thread_id: threadId,
+          role: "user",
+          content: trimmed,
+          created_at: new Date().toISOString(),
+        }
+        setMessages((prev) => [...prev, userMsg, initialAssistantMsg])
+      }
       setIsStreaming(true)
 
       try {
@@ -115,6 +128,8 @@ export function useChatStream({ threadId }: UseChatStreamOptions) {
           body: JSON.stringify({
             threadId,
             messages: [{ role: "user", content: trimmed }],
+            model: modelOverride || localStorage.getItem("selected_llm_model") || "gemini-2.5-flash",
+            parentUserMessageId,
           }),
         })
 
@@ -132,6 +147,7 @@ export function useChatStream({ threadId }: UseChatStreamOptions) {
         const decoder = new TextDecoder()
         let buffer = ""
         let accumulatedAssistantText = ""
+        let currentAssistantId = assistantMessageId
 
         while (true) {
           const { done, value } = await reader.read()
@@ -153,7 +169,7 @@ export function useChatStream({ threadId }: UseChatStreamOptions) {
                 // Update assistant message content in state
                 setMessages((prev) =>
                   prev.map((m) =>
-                    m.id === assistantMessageId
+                    (m.id === assistantMessageId || m.id === currentAssistantId)
                       ? { ...m, content: accumulatedAssistantText }
                       : m
                   )
@@ -179,11 +195,23 @@ export function useChatStream({ threadId }: UseChatStreamOptions) {
                       if (item.stage === "complete") {
                         setTimeout(() => setPipelineStatus(null), 800)
                       }
+                    } else if (item.type === "thread_title") {
+                      if (typeof window !== "undefined") {
+                        window.dispatchEvent(
+                          new CustomEvent("thread_title_updated", {
+                            detail: {
+                              threadId: item.threadId,
+                              title: item.title,
+                            },
+                          })
+                        )
+                      }
                     } else if (item.type === "citations") {
                       const cits = item.citations as Citation[]
+                      if (item.messageId) currentAssistantId = item.messageId
                       setMessages((prev) =>
                         prev.map((m) =>
-                          m.id === assistantMessageId
+                          (m.id === assistantMessageId || m.id === currentAssistantId)
                             ? {
                                 ...m,
                                 id: item.messageId || m.id,

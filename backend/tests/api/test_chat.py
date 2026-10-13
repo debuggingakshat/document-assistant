@@ -425,3 +425,55 @@ def test_chat_stream_success_emits_ai_sdk_stream():
         assert 'd:{"finishReason": "stop"' in body_text
     finally:
         app.dependency_overrides.clear()
+
+
+def test_update_thread_pin_and_archive():
+    thread_id = uuid.uuid4()
+    mock_thread = {
+        "id": str(thread_id),
+        "user_id": str(_USER_A_ID),
+        "title": "Old Title",
+    }
+    mock_updated = {
+        "id": str(thread_id),
+        "user_id": str(_USER_A_ID),
+        "title": "Old Title",
+        "is_pinned": True,
+        "is_archived": True,
+        "created_at": _NOW,
+        "updated_at": _NOW,
+    }
+
+    app.dependency_overrides[get_current_user] = lambda: _USER_A
+    try:
+        with (
+            patch("app.api.chat.chats.get_thread", return_value=mock_thread),
+            patch(
+                "app.api.chat.chats.update_thread", return_value=mock_updated
+            ) as mock_update,
+        ):
+            resp = client.patch(
+                f"/threads/{thread_id}", json={"is_pinned": True, "is_archived": True}
+            )
+
+        assert resp.status_code == 200
+        assert resp.json()["is_pinned"] is True
+        assert resp.json()["is_archived"] is True
+        mock_update.assert_called_once_with(
+            client=ANY, thread_id=thread_id, is_pinned=True, is_archived=True
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_list_threads_archived_filter():
+    app.dependency_overrides[get_current_user] = lambda: _USER_A
+    try:
+        with patch("app.api.chat.chats.list_threads", return_value=[]) as mock_list:
+            resp = client.get("/threads?archived=true")
+            assert resp.status_code == 200
+            mock_list.assert_called_once_with(
+                client=ANY, user_id=_USER_A_ID, only_archived=True, include_archived=False
+            )
+    finally:
+        app.dependency_overrides.clear()

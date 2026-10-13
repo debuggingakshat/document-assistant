@@ -34,15 +34,25 @@ def create_thread(
     return data[0]
 
 
-def list_threads(client: Client, user_id: uuid.UUID) -> list[dict[str, Any]]:
-    """List all chat threads belonging to the user, most recently updated first."""
-    response = (
-        client.table("chat_threads")
-        .select("*")
-        .eq("user_id", str(user_id))
-        .order("updated_at", desc=True)
-        .execute()
-    )
+def list_threads(
+    client: Client,
+    user_id: uuid.UUID,
+    include_archived: bool = False,
+    only_archived: bool = False,
+) -> list[dict[str, Any]]:
+    """List chat threads belonging to the user.
+
+    By default, excludes archived threads and sorts pinned threads first,
+    then by updated_at descending.
+    """
+    query = client.table("chat_threads").select("*").eq("user_id", str(user_id))
+    if only_archived:
+        query = query.eq("is_archived", True)
+    elif not include_archived:
+        query = query.eq("is_archived", False)
+
+    query = query.order("is_pinned", desc=True).order("updated_at", desc=True)
+    response = query.execute()
     return response.data if response else None or []
 
 
@@ -58,11 +68,25 @@ def get_thread(client: Client, thread_id: uuid.UUID) -> dict[str, Any] | None:
     return response.data if response else None
 
 
-def update_thread(client: Client, thread_id: uuid.UUID, title: str) -> dict[str, Any]:
-    """Update a thread's title and updated_at timestamp."""
+def update_thread(
+    client: Client,
+    thread_id: uuid.UUID,
+    title: str | None = None,
+    is_pinned: bool | None = None,
+    is_archived: bool | None = None,
+) -> dict[str, Any]:
+    """Update a thread's title, pin status, or archive status."""
+    payload: dict[str, Any] = {"updated_at": datetime.now(UTC).isoformat()}
+    if title is not None:
+        payload["title"] = title
+    if is_pinned is not None:
+        payload["is_pinned"] = is_pinned
+    if is_archived is not None:
+        payload["is_archived"] = is_archived
+
     response = (
         client.table("chat_threads")
-        .update({"title": title, "updated_at": datetime.now(UTC).isoformat()})
+        .update(payload)
         .eq("id", str(thread_id))
         .execute()
     )

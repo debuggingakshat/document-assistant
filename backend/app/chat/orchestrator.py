@@ -11,13 +11,16 @@ from typing import Any
 from supabase import Client
 
 from app.assistant.agent import DocumentAgentDeps, create_document_agent
+from app.assistant.model import FALLBACK_MODELS, get_llm_model
+from pydantic_ai.models.google import GoogleModel
 from app.assistant.schemas import GroundedAnswer
+from pydantic_ai import Agent
 from app.chat.streaming import (
     format_ai_sdk_finish_part,
     format_ai_sdk_status_part,
     format_ai_sdk_text_part,
 )
-from app.database.chats import save_citations, save_message
+from app.database.chats import get_thread, save_citations, save_message, update_thread
 from app.grounding.validator import GroundingValidator, ValidationResult
 from app.retrieval.models import RetrievedPassage
 from app.retrieval.retriever import Retriever
@@ -74,6 +77,26 @@ def _extract_ticker_and_fy(query: str) -> tuple[str | None, int | None]:
     return ticker, fiscal_year
 
 
+
+async def _run_agent_with_failover(
+    agent: Agent[DocumentAgentDeps, GroundedAnswer],
+    user_content: str,
+    deps: DocumentAgentDeps,
+) -> Any:
+    """Run agent with automatic failover to healthy models if high demand (503/429) occurs."""
+    try:
+        return await agent.run(user_content, deps=deps)
+    except Exception as exc:
+        logger.warning("Primary agent run failed with error: %s. Attempting fallback models...", exc)
+        for fb_model_name in FALLBACK_MODELS:
+            try:
+                logger.info("Executing failover with healthy model: %s", fb_model_name)
+                fb_agent = create_document_agent(model=GoogleModel(fb_model_name))
+                return await fb_agent.run(user_content, deps=deps)
+            except Exception as fb_exc:
+                logger.warning("Failover model %s also encountered error: %s", fb_model_name, fb_exc)
+        raise exc
+
 async def orchestrate_turn(
     client: Client,
     thread_id: uuid.UUID,
@@ -82,21 +105,28 @@ async def orchestrate_turn(
     validator: GroundingValidator | None = None,
     agent_override: Any | None = None,
     user_metadata: dict[str, Any] | None = None,
+    model_name: str | None = None,
+    parent_user_message_id: uuid.UUID | None = None,
 ) -> TurnResult:
     """Execute a single complete turn synchronously with database persistence."""
     retriever = retriever or Retriever()
     validator = validator or GroundingValidator(strict=True)
-    agent = agent_override or create_document_agent()
-
-    # 1. Persist user message
-    user_msg = save_message(
-        client=client,
-        thread_id=thread_id,
-        role="user",
-        content=user_content,
-        ai_sdk_metadata=user_metadata,
+    agent = agent_override or create_document_agent(
+        model=get_llm_model(model_name) if model_name else None
     )
-    user_msg_id = uuid.UUID(str(user_msg["id"]))
+
+    # 1. Persist user message (reuse parent if regenerating)
+    if parent_user_message_id:
+        user_msg_id = parent_user_message_id
+    else:
+        user_msg = save_message(
+            client=client,
+            thread_id=thread_id,
+            role="user",
+            content=user_content,
+            ai_sdk_metadata=user_metadata,
+        )
+        user_msg_id = uuid.UUID(str(user_msg["id"]))
 
     # 2. Extract heuristics and run Phase 5 hybrid retrieval
     ticker, fiscal_year = _extract_ticker_and_fy(user_content)
@@ -120,7 +150,7 @@ async def orchestrate_turn(
     )
 
     # 3. Run PydanticAI Gemini agent
-    agent_result = await agent.run(user_content, deps=deps)
+    agent_result = await _run_agent_with_failover(agent, user_content, deps)
     grounded_answer: GroundedAnswer = agent_result.output
 
     # 4. Enforce grounding verification
@@ -139,12 +169,17 @@ async def orchestrate_turn(
         )
         final_answer_text += warning_msg
 
-    # 5. Persist assistant message
+    # 5. Persist assistant message with model & parent linkage
+    asst_metadata: dict[str, Any] = {"model": model_name or "gemini-2.5-flash"}
+    if parent_user_message_id:
+        asst_metadata["parent_user_message_id"] = str(parent_user_message_id)
+
     asst_msg = save_message(
         client=client,
         thread_id=thread_id,
         role="assistant",
         content=final_answer_text,
+        ai_sdk_metadata=asst_metadata,
     )
     asst_msg_id = uuid.UUID(str(asst_msg["id"]))
 
@@ -179,6 +214,61 @@ async def orchestrate_turn(
     )
 
 
+async def maybe_generate_thread_title(
+    client: Client,
+    thread_id: uuid.UUID,
+    user_content: str,
+    model_name: str | None = None,
+) -> str | None:
+    """Generate a crisp 3-5 word title for untitled threads using fast LLM summarization."""
+    try:
+        thread = get_thread(client, thread_id)
+        if not thread:
+            return None
+
+        current_title = thread.get("title")
+        if current_title and current_title.strip() not in (
+            "",
+            "Untitled Analysis",
+            "Untitled Thread",
+            "New Thread",
+        ):
+            return None
+
+        fallback_title = user_content.strip()[:40].strip()
+        if len(user_content.strip()) > 40:
+            fallback_title = fallback_title.rsplit(" ", 1)[0] + "..."
+
+        try:
+            model = get_llm_model(model_name)
+            title_agent: Agent[None, str] = Agent(
+                model=model,
+                output_type=str,
+                system_prompt=(
+                    "You are an editor for an SEC equity research system. "
+                    "Summarize the user inquiry into a crisp 3 to 5 word conversation title. "
+                    "Focus on the company ticker or name and the core financial topic (e.g. 'Apple FY24 iPhone Sales', 'AWS Margins & GenAI'). "
+                    "Do NOT use quotation marks, punctuation, or generic filler words like 'Analysis of', 'Question about'. "
+                    "Output ONLY the 3-5 word title."
+                ),
+            )
+            res = await title_agent.run(user_content)
+            raw = res.output.strip().strip('"').strip("'").strip()
+            clean_title = (raw.splitlines()[0] if raw.splitlines() else raw).strip(".").strip()[:50]
+            if len(clean_title) < 3:
+                clean_title = fallback_title
+        except Exception as e:
+            logger.warning("LLM title generation failed, using fallback: %s", e)
+            clean_title = fallback_title
+
+        update_thread(client, thread_id, title=clean_title)
+        logger.info("Auto-named thread %s to '%s'", thread_id, clean_title)
+        return clean_title
+    except Exception as e:
+        logger.warning("Failed to auto-name thread %s: %s", thread_id, e)
+        return None
+
+
 async def stream_orchestrated_turn(
     client: Client,
     thread_id: uuid.UUID,
@@ -187,13 +277,29 @@ async def stream_orchestrated_turn(
     validator: GroundingValidator | None = None,
     agent_override: Any | None = None,
     user_metadata: dict[str, Any] | None = None,
+    model_name: str | None = None,
+    parent_user_message_id: uuid.UUID | None = None,
 ) -> AsyncIterator[str]:
     """Execute turn with progressive technical status updates and stream SSE events to frontend."""
     retriever = retriever or Retriever()
     validator = validator or GroundingValidator(strict=True)
-    agent = agent_override or create_document_agent()
+    agent = agent_override or create_document_agent(
+        model=get_llm_model(model_name) if model_name else None
+    )
 
     ticker, fiscal_year = _extract_ticker_and_fy(user_content)
+
+    # Kick off background title generation if thread is untitled
+    title_task: asyncio.Task[str | None] | None = None
+    if not parent_user_message_id:
+        title_task = asyncio.create_task(
+            maybe_generate_thread_title(
+                client=client,
+                thread_id=thread_id,
+                user_content=user_content,
+                model_name=model_name,
+            )
+        )
 
     # Step 1: Hybrid Retrieval
     yield format_ai_sdk_status_part(
@@ -210,14 +316,18 @@ async def stream_orchestrated_turn(
         },
     )
 
-    # 1. Persist user message
-    user_msg = save_message(
-        client=client,
-        thread_id=thread_id,
-        role="user",
-        content=user_content,
-        ai_sdk_metadata=user_metadata,
-    )
+    # 1. Persist user message (reuse parent if regenerating)
+    if parent_user_message_id:
+        user_msg_id = parent_user_message_id
+    else:
+        user_msg = save_message(
+            client=client,
+            thread_id=thread_id,
+            role="user",
+            content=user_content,
+            ai_sdk_metadata=user_metadata,
+        )
+        user_msg_id = uuid.UUID(str(user_msg["id"]))
 
     # 2. Extract heuristics and run Phase 5 hybrid retrieval
     logger.info(
@@ -252,22 +362,45 @@ async def stream_orchestrated_turn(
         initial_passages=initial_passages,
     )
 
+    active_llm_name = model_name or "gemini-2.5-flash"
+    llm_display_label = {
+        "gemini-2.5-flash": "Gemini 2.5 Flash",
+        "gemini-2.5-pro": "Gemini 2.5 Pro",
+        "gemini-2.0-flash-lite": "Gemini 2.0 Flash Lite",
+    }.get(active_llm_name, active_llm_name)
+
     # Step 3: PydanticAI Reasoning
     yield format_ai_sdk_status_part(
         stage="reasoning",
-        title="PydanticAI Reasoning with Gemini Flash",
-        message="Injecting verified context window into Gemini system prompt. Synthesizing disclosures and extracting financial metrics under Meridian Research compliance directives...",
+        title=f"PydanticAI Reasoning with {llm_display_label}",
+        message=f"Injecting verified context window into {llm_display_label} system prompt. Synthesizing disclosures and extracting financial metrics under Meridian Research compliance directives...",
         technical_details={
             "orchestrator": "PydanticAI v2.52.0",
-            "llm": "gemini-3-flash-preview",
+            "llm": active_llm_name,
             "system_prompt": "Meridian Research Trust Directives",
             "compliance": "Strict corpus grounding, no non-causal speculation",
         },
     )
 
     # 3. Run PydanticAI Gemini agent
-    agent_result = await agent.run(user_content, deps=deps)
-    grounded_answer: GroundedAnswer = agent_result.output
+    try:
+        agent_result = await _run_agent_with_failover(agent, user_content, deps)
+        grounded_answer: GroundedAnswer = agent_result.output
+    except Exception as exc:
+        logger.error("All models failed during generation: %s", exc)
+        yield format_ai_sdk_status_part(
+            stage="complete",
+            title="Service Temporarily Busy",
+            message=f"Google AI is currently experiencing high demand ({type(exc).__name__}). Please retry shortly.",
+        )
+        yield format_ai_sdk_text_part(
+            "> [!WARNING]\n"
+            "> **Google AI High Demand Notice**\n>\n"
+            "> The AI model endpoint is temporarily saturated with high demand (HTTP 503). "
+            "Please click the **Retry** button or resend your query in a few moments."
+        )
+        yield format_ai_sdk_finish_part()
+        return
 
     # Step 4: Grounding Validation
     yield format_ai_sdk_status_part(
@@ -299,12 +432,17 @@ async def stream_orchestrated_turn(
         )
         final_answer_text += warning_msg
 
-    # 5. Persist assistant message
+    # 5. Persist assistant message with model & parent linkage
+    asst_metadata: dict[str, Any] = {"model": model_name or "gemini-2.5-flash"}
+    if parent_user_message_id:
+        asst_metadata["parent_user_message_id"] = str(parent_user_message_id)
+
     asst_msg = save_message(
         client=client,
         thread_id=thread_id,
         role="assistant",
         content=final_answer_text,
+        ai_sdk_metadata=asst_metadata,
     )
     asst_msg_id = uuid.UUID(str(asst_msg["id"]))
 
@@ -383,5 +521,19 @@ async def stream_orchestrated_turn(
         }
         yield f"2:[{json.dumps(citation_data)}]\n"
 
-    # 9. Finish stream
+    # 9. Yield auto-generated thread title if ready
+    if title_task:
+        try:
+            generated_title = await asyncio.wait_for(title_task, timeout=1.5)
+            if generated_title:
+                title_payload = {
+                    "type": "thread_title",
+                    "threadId": str(thread_id),
+                    "title": generated_title,
+                }
+                yield f"2:[{json.dumps(title_payload)}]" + chr(10)
+        except Exception:
+            pass
+
+    # 10. Finish stream
     yield format_ai_sdk_finish_part()

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { Plus, Sparkles } from "lucide-react"
+import { Plus } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { createThread, listThreads } from "@/lib/api"
@@ -50,14 +50,23 @@ export function HomePage() {
   }
 
   return (
-    <div className="flex flex-1 flex-col items-center justify-center p-8 text-center bg-background">
-      <div className="flex h-12 w-12 items-center justify-center rounded-2xl border bg-muted/60 text-foreground shadow-xs">
-        <Sparkles className="h-6 w-6" />
+    <div className="flex flex-1 flex-col items-center justify-center p-8 text-center bg-background select-none">
+      <div className="flex items-center justify-center">
+        <img
+          src="/meridian-logo-light.png"
+          alt="Meridian Research"
+          className="h-12 w-auto object-contain dark:hidden"
+        />
+        <img
+          src="/meridian-logo-dark.png"
+          alt="Meridian Research"
+          className="h-12 w-auto object-contain hidden dark:block"
+        />
       </div>
-      <h1 className="mt-4 text-xl font-semibold tracking-tight text-foreground">
-        Welcome to Document Assistant
+      <h1 className="mt-3 text-base font-semibold tracking-wide text-foreground">
+        Document Assistant
       </h1>
-      <p className="mt-2 max-w-sm text-xs text-muted-foreground">
+      <p className="mt-1.5 max-w-sm text-xs text-muted-foreground">
         Your AI research partner for financial disclosures and SEC filings.
         Start a new conversation to begin analyzing 10-K and 10-Q reports.
       </p>

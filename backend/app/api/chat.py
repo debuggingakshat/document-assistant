@@ -26,13 +26,17 @@ class CreateThreadRequest(BaseModel):
 
 
 class UpdateThreadRequest(BaseModel):
-    title: str = Field(min_length=1, max_length=500)
+    title: str | None = Field(default=None, max_length=500)
+    is_pinned: bool | None = None
+    is_archived: bool | None = None
 
 
 class ThreadResponse(BaseModel):
     id: uuid.UUID
     user_id: uuid.UUID
     title: str | None = None
+    is_pinned: bool = False
+    is_archived: bool = False
     created_at: datetime
     updated_at: datetime
 
@@ -51,6 +55,11 @@ class ChatStreamRequest(BaseModel):
         validation_alias=AliasChoices("threadId", "thread_id"),
     )
     messages: list[dict[str, Any]] = Field(default_factory=list)
+    model: str | None = None
+    parent_user_message_id: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("parentUserMessageId", "parent_user_message_id"),
+    )
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -63,10 +72,16 @@ class ChatStreamRequest(BaseModel):
 @router.get("/threads", response_model=list[ThreadResponse])
 async def list_threads(
     user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    archived: bool = False,
 ) -> list[dict[str, Any]]:
     """List all chat threads belonging to the authenticated user."""
     client = get_service_role_client()
-    return chats.list_threads(client=client, user_id=user.id)
+    return chats.list_threads(
+        client=client,
+        user_id=user.id,
+        only_archived=archived,
+        include_archived=False,
+    )
 
 
 @router.post(
@@ -88,7 +103,7 @@ async def update_thread(
     body: UpdateThreadRequest,
     user: Annotated[AuthenticatedUser, Depends(get_current_user)],
 ) -> dict[str, Any]:
-    """Rename a chat thread."""
+    """Update a chat thread (rename, pin, archive)."""
     client = get_service_role_client()
     thread = chats.get_thread(client=client, thread_id=thread_id)
     if thread is None:
@@ -103,8 +118,18 @@ async def update_thread(
             detail="You do not have access to this thread",
         )
 
+    kwargs: dict[str, Any] = {}
+    if body.title is not None:
+        kwargs["title"] = body.title.strip()
+    if body.is_pinned is not None:
+        kwargs["is_pinned"] = body.is_pinned
+    if body.is_archived is not None:
+        kwargs["is_archived"] = body.is_archived
+
     return chats.update_thread(
-        client=client, thread_id=thread_id, title=body.title.strip()
+        client=client,
+        thread_id=thread_id,
+        **kwargs,
     )
 
 
@@ -220,12 +245,26 @@ async def chat_stream(
             detail="User message content cannot be empty",
         )
 
+    parsed_parent_id: uuid.UUID | None = None
+    if body.parent_user_message_id:
+        try:
+            parsed_parent_id = uuid.UUID(str(body.parent_user_message_id))
+        except (ValueError, TypeError):
+            db_user_msgs = [
+                m for m in chats.list_messages(client, body.thread_id)
+                if m.get("role") == "user"
+            ]
+            if db_user_msgs:
+                parsed_parent_id = uuid.UUID(str(db_user_msgs[-1]["id"]))
+
     return StreamingResponse(
         stream_orchestrated_turn(
             client=client,
             thread_id=body.thread_id,
             user_content=content,
             user_metadata=user_message,
+            model_name=body.model,
+            parent_user_message_id=parsed_parent_id,
         ),
         media_type="text/plain; charset=utf-8",
         headers={"x-vercel-ai-data-stream": "v1"},
