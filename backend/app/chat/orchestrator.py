@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+import re
 import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
@@ -39,6 +40,54 @@ class TurnResult:
     citations_saved: list[dict[str, Any]]
     passages_used: list[RetrievedPassage]
 
+
+
+def extract_best_numeric_snippet(text: str, full_context: str | None = None) -> str:
+    """Extract the most informative financial passage segment containing numbers, currency, or metrics."""
+    source = full_context or text
+    if not source:
+        return ""
+
+    # Split into candidate sentences or table rows
+    segments = re.split(r"(?<=[.;\n])\s+|,\s{2,}|\n+", source)
+    scored_segments: list[tuple[int, str]] = []
+
+    for seg in segments:
+        clean = seg.strip()
+        if len(clean) < 15:
+            continue
+
+        score = 0
+        if "$" in clean:
+            score += 6
+        if "%" in clean:
+            score += 5
+        if re.search(r"\b\d+(?:,\d{3})*(?:\.\d+)?\b", clean):
+            score += 4
+        if re.search(r"\b(million|billion|dividend|share|repurchase|revenue|income|operating|cash)\b", clean, re.I):
+            score += 3
+        # Penalize if it is mostly repeating identical phrases or empty table columns
+        words = clean.split()
+        if len(words) > 6 and len(set(words)) < len(words) * 0.4:
+            score -= 6
+        if clean.startswith("-.") or clean.startswith("= -."):
+            score -= 3
+
+        if score > 0:
+            scored_segments.append((score, clean))
+
+    scored_segments.sort(key=lambda x: x[0], reverse=True)
+    if scored_segments:
+        top_pieces: list[str] = []
+        seen: set[str] = set()
+        for _, s in scored_segments[:2]:
+            s_clean = re.sub(r"\s+", " ", s).strip(" ,=-")
+            if s_clean and s_clean not in seen:
+                seen.add(s_clean)
+                top_pieces.append(s_clean)
+        return " ... ".join(top_pieces)
+
+    return text[:250].strip()
 
 def _extract_ticker_and_fy(query: str) -> tuple[str | None, int | None]:
     """Lightweight heuristic to detect company ticker and fiscal year in user queries.
@@ -187,18 +236,27 @@ async def orchestrate_turn(
     citation_payloads: list[dict[str, Any]] = []
     passage_by_id = {p.chunk_id: p for p in deps.all_retrieved_passages}
 
-    for idx, cit in enumerate(val_result.verified_citations, start=1):
+    for fallback_idx, cit in enumerate(val_result.verified_citations, start=1):
         p = passage_by_id.get(cit.chunk_id)
+        label_match = re.search(r"\d+", cit.citation_label or "")
+        cit_idx = int(label_match.group(0)) if label_match else fallback_idx
+
+        best_snippet = cit.snippet.strip() if cit.snippet else ""
+        if (not best_snippet or len(best_snippet) < 10 or not any(c.isdigit() for c in best_snippet)) and p:
+            fallback_snippet = extract_best_numeric_snippet(p.text, p.full_context_text)
+            if fallback_snippet:
+                best_snippet = fallback_snippet
+
         citation_payloads.append(
             {
                 "chunk_id": cit.chunk_id,
-                "citation_index": idx,
+                "citation_index": cit_idx,
                 "ticker": cit.ticker or (p.ticker if p else None),
                 "filing_type": p.filing_type if p else "10-K",
                 "filing_date": p.filing_date if p else None,
                 "section": cit.section
                 or (" > ".join(p.headings) if p and p.headings else None),
-                "snippet": cit.snippet or (p.text[:200] if p else None),
+                "snippet": best_snippet or (p.text[:250] if p else None),
             }
         )
 
@@ -450,18 +508,27 @@ async def stream_orchestrated_turn(
     citation_payloads: list[dict[str, Any]] = []
     passage_by_id = {p.chunk_id: p for p in deps.all_retrieved_passages}
 
-    for idx, cit in enumerate(val_result.verified_citations, start=1):
+    for fallback_idx, cit in enumerate(val_result.verified_citations, start=1):
         p = passage_by_id.get(cit.chunk_id)
+        label_match = re.search(r"\d+", cit.citation_label or "")
+        cit_idx = int(label_match.group(0)) if label_match else fallback_idx
+
+        best_snippet = cit.snippet.strip() if cit.snippet else ""
+        if (not best_snippet or len(best_snippet) < 10 or not any(c.isdigit() for c in best_snippet)) and p:
+            fallback_snippet = extract_best_numeric_snippet(p.text, p.full_context_text)
+            if fallback_snippet:
+                best_snippet = fallback_snippet
+
         citation_payloads.append(
             {
                 "chunk_id": cit.chunk_id,
-                "citation_index": idx,
+                "citation_index": cit_idx,
                 "ticker": cit.ticker or (p.ticker if p else None),
                 "filing_type": p.filing_type if p else "10-K",
                 "filing_date": p.filing_date if p else None,
                 "section": cit.section
                 or (" > ".join(p.headings) if p and p.headings else None),
-                "snippet": cit.snippet or (p.text[:200] if p else None),
+                "snippet": best_snippet or (p.text[:250] if p else None),
             }
         )
 
@@ -497,6 +564,12 @@ async def stream_orchestrated_turn(
                 cid = None
             p = passage_by_id.get(cid) if cid else None
 
+            raw_snippet = cit.get("snippet") or cit.get("excerpt") or ""
+            if (not raw_snippet or len(raw_snippet) < 10 or not any(c.isdigit() for c in raw_snippet)) and p:
+                extracted = extract_best_numeric_snippet(p.text, p.full_context_text)
+                if extracted:
+                    raw_snippet = extracted
+
             enriched_citations.append(
                 {
                     "id": str(cit.get("id", uuid.uuid4())),
@@ -506,10 +579,10 @@ async def stream_orchestrated_turn(
                     "company_name": p.company_name if p else "",
                     "fiscal_year": p.fiscal_year if p else None,
                     "filing_type": cit.get("filing_type", "10-K"),
-                    "filing_date": cit.get("filing_date"),
+                    "filing_date": str(cit.get("filing_date") or ""),
                     "section": cit.get("section") or "",
-                    "snippet": cit.get("excerpt") or cit.get("snippet") or (p.text[:200] if p else ""),
-                    "full_context_text": p.full_context_text if p else "",
+                    "snippet": raw_snippet or (p.text[:250] if p else ""),
+                    "full_context_text": p.full_context_text if p else (p.text if p else ""),
                     "is_table": p.is_table if p else False,
                 }
             )

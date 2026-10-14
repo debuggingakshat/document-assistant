@@ -8,13 +8,13 @@ import {
   Copy,
   ExternalLink,
   FileSpreadsheet,
-  FileText,
   RotateCw,
   ShieldCheck,
   User,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { FinancialTable } from "@/components/chat/FinancialTable"
+import { highlightFinancialFigures } from "@/components/chat/SourcePassageSheet"
 import {
   HoverCard,
   HoverCardContent,
@@ -104,7 +104,10 @@ export function MessageItem({
     const map = new Map<number, Citation>()
     if (message.citations) {
       for (const c of message.citations) {
-        map.set(c.citation_index, c)
+        const numIdx = Number(c.citation_index)
+        if (!isNaN(numIdx)) {
+          map.set(numIdx, c)
+        }
       }
     }
 
@@ -180,10 +183,12 @@ export function MessageItem({
                 <span>[^{index}]</span>
               </button>
             </HoverCardTrigger>
-            <HoverCardContent className="w-84 space-y-2 text-left">
+            <HoverCardContent className="w-88 space-y-2 text-left shadow-lg border border-border/80">
               <div className="flex items-center justify-between border-b border-border/60 pb-1.5">
-                <div className="flex items-center gap-1.5">
-                  <FileText className="size-3.5 text-primary" />
+                <div className="flex items-center gap-1.5 truncate">
+                  <span className="flex size-5 shrink-0 items-center justify-center rounded bg-primary/10 font-mono text-[10px] font-bold text-primary border border-primary/25">
+                    [^{index}]
+                  </span>
                   <span className="font-semibold text-foreground truncate text-xs">
                     {cit.company_name || cit.ticker || "SEC 10-K Reference"}
                   </span>
@@ -195,14 +200,18 @@ export function MessageItem({
                 {cit.filing_type || "10-K"} · FY{cit.fiscal_year || "Latest"} · {cit.section || "Disclosures"}
               </p>
 
-              {cit.snippet && (
-                <blockquote className="border-l-2 border-primary/50 pl-2 text-[11px] italic text-muted-foreground line-clamp-3">
-                  "{cit.snippet}"
-                </blockquote>
-              )}
+              {/* Cited Evidence with Highlighted Financial Figures */}
+              <div className="rounded-md border border-primary/25 bg-primary/5 p-2.5 text-[11px] text-foreground/90 leading-relaxed max-h-28 overflow-y-auto">
+                <span className="text-[9.5px] font-mono font-bold text-primary block mb-1 uppercase tracking-wider">
+                  Cited Supporting Evidence:
+                </span>
+                <p className="line-clamp-3 italic">
+                  {highlightFinancialFigures(cit.snippet || cit.full_context_text || "Referenced SEC disclosure context.")}
+                </p>
+              </div>
 
-              <div className="pt-1 flex items-center justify-between text-[10px] text-primary font-medium">
-                <span>Click to open full passage</span>
+              <div className="pt-0.5 flex items-center justify-between text-[10px] text-primary font-medium">
+                <span>Click to inspect full passage & metrics</span>
                 <ExternalLink className="size-2.5" />
               </div>
             </HoverCardContent>
