@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react"
-import { Building2 } from "lucide-react"
 import { Link, useNavigate } from "react-router-dom"
+import { ThemeToggle } from "@/components/chat/ThemeToggle"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -74,11 +74,24 @@ export function SignUpPage() {
   }
 
   return (
-    <div className="flex min-h-screen w-full items-center justify-center bg-background px-4">
+    <div className="relative flex min-h-screen w-full items-center justify-center bg-background px-4">
+      <div className="absolute top-4 right-4">
+        <ThemeToggle />
+      </div>
+
       <Card className="w-full max-w-sm rounded-2xl border border-border/80 bg-card shadow-sm">
-        <CardHeader className="space-y-3 pb-4">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-foreground text-background shadow-xs">
-            <Building2 className="h-5 w-5" />
+        <CardHeader className="space-y-3.5 pb-4">
+          <div className="flex items-center select-none pt-1">
+            <img
+              src="/meridian-logo-light.png"
+              alt="Meridian Research"
+              className="h-8.5 w-auto object-contain dark:hidden"
+            />
+            <img
+              src="/meridian-logo-dark.png"
+              alt="Meridian Research"
+              className="h-8.5 w-auto object-contain hidden dark:block"
+            />
           </div>
           <div>
             <CardTitle className="text-lg font-semibold tracking-tight text-foreground">

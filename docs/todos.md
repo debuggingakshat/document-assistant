@@ -176,14 +176,29 @@ Goal: 5 senior analysts can use it for a week and report ≥3 hours saved per an
 
 ---
 
-## Phase 9 — Deployment (Railway)
+## Phase 9 — Deployment (Vercel + Hugging Face Spaces)
 
-- [ ] Railway: backend service (Uvicorn, env vars, `ALLOWED_ORIGINS`)
-- [ ] Railway: frontend service (Vite build, `VITE_*` env vars at build time)
-- [ ] Supabase: re-enable email confirmation for production if disabled during dev
-- [ ] Run `alembic upgrade head` against production Supabase (direct connection)
-- [ ] Run ingestion against production database
-- [ ] End-to-end test on deployed URLs with a real Meridian-style email account
+Goal: 100% free production deployment with high-performance global CDN for frontend and 16 GB RAM for backend ML embeddings.
+
+### Frontend Deployment (Vercel)
+- [x] Create `frontend/vercel.json` with SPA route rewrites to prevent 404s on page refresh
+- [ ] Connect GitHub repository to Vercel with Root Directory set to `frontend`
+- [ ] Set frontend environment variables (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_API_BASE_URL`)
+- [ ] Deploy Vite build to Vercel production CDN
+- [ ] Verify frontend authentication pages (`/login`, `/signup`) and route guards on live URL
+
+### Backend Deployment (Hugging Face Spaces)
+- [ ] Configure `backend/Dockerfile` with Python 3.12, `uv`, dependencies, and port 7860
+- [ ] Add CORS `ALLOWED_ORIGINS` in backend configuration for the Vercel production domain
+- [ ] Create a new Docker Space on Hugging Face (16 GB RAM free tier)
+- [ ] Add encrypted Space secrets (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `GOOGLE_API_KEY`, etc.)
+- [ ] Sync/deploy backend to Hugging Face Space
+- [ ] Verify backend `/health` endpoint and OpenAPI docs on live `.hf.space` domain
+
+### Integration & Verification
+- [ ] Update Vercel `VITE_API_BASE_URL` with the live Hugging Face Space URL
+- [ ] Add Vercel URL to Supabase Auth -> Redirect URLs / Allowed Web Origins
+- [ ] End-to-end test on deployed URLs: user login, chat streaming, citation inspection drawer, and financial tables
 
 ---
 
