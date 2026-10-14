@@ -26,7 +26,8 @@ from app.grounding.validator import GroundingValidator, ValidationResult
 from app.retrieval.models import RetrievedPassage
 from app.retrieval.retriever import Retriever
 
-logger = logging.getLogger(__name__)
+from app.logging import get_logger
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -120,8 +121,9 @@ def _extract_ticker_and_fy(query: str) -> tuple[str | None, int | None]:
 
     import re
 
-    match = re.search(r"\b(202[0-5])\b", query)
-    fiscal_year = int(match.group(1)) if match else None
+    # If multiple years or a range (e.g. 2021-2025) are mentioned, do not restrict to a single fiscal year.
+    years = re.findall(r"\b(202[0-5])\b", query)
+    fiscal_year = int(years[0]) if len(years) == 1 else None
 
     return ticker, fiscal_year
 
@@ -133,15 +135,23 @@ async def _run_agent_with_failover(
     deps: DocumentAgentDeps,
 ) -> Any:
     """Run agent with automatic failover to healthy models if high demand (503/429) occurs."""
+    primary_model_name = getattr(agent.model, "model_name", None) or "gemini-3-flash-preview"
     try:
-        return await agent.run(user_content, deps=deps)
+        return await asyncio.wait_for(agent.run(user_content, deps=deps), timeout=75.0)
     except Exception as exc:
-        logger.warning("Primary agent run failed with error: %s. Attempting fallback models...", exc)
+        logger.warning(
+            "Primary agent run with %s failed with error: %s. Attempting fallback models...",
+            primary_model_name,
+            exc,
+        )
         for fb_model_name in FALLBACK_MODELS:
+            if fb_model_name == primary_model_name:
+                continue
             try:
+                await asyncio.sleep(1.5)
                 logger.info("Executing failover with healthy model: %s", fb_model_name)
                 fb_agent = create_document_agent(model=GoogleModel(fb_model_name))
-                return await fb_agent.run(user_content, deps=deps)
+                return await asyncio.wait_for(fb_agent.run(user_content, deps=deps), timeout=75.0)
             except Exception as fb_exc:
                 logger.warning("Failover model %s also encountered error: %s", fb_model_name, fb_exc)
         raise exc
