@@ -189,10 +189,24 @@ Goal: 5 senior analysts can use it for a week and report ≥3 hours saved per an
 
 ## Quick reference
 
+### Project & Subsystem READMEs
+
+| Doc | Purpose |
+| --- | ------- |
+| [README.md](../README.md) | Root project overview, architecture, quickstart, client brief compliance |
+| [backend/README.md](../backend/README.md) | FastAPI service setup, environment variables, test commands |
+| [frontend/README.md](../frontend/README.md) | React + Vite client, citation drawer, theme support |
+| [data/README.md](../data/README.md) | SEC EDGAR corpus, HTML-to-Markdown pipeline, SEC table cleaner |
+| [backend/app/assistant/README.md](../backend/app/assistant/README.md) | PydanticAI agent, system prompt contract, reasoning architecture |
+| [backend/app/grounding/README.md](../backend/app/grounding/README.md) | Grounding safety validator, citation verification, refusal contract |
+| [backend/app/retrieval/README.md](../backend/app/retrieval/README.md) | Hybrid dense vector + keyword search, RRF rank fusion, neighbor expansion |
+
+### Architecture & Specification Guides
+
 | Doc | Purpose |
 | --- | ------- |
 | [client-brief.md](client-brief.md) | What Meridian Research needs and example questions |
 | [architecture.md](architecture.md) | System design, data model, streaming contract |
-| [guides/supabase-setup.md](guides/supabase-setup.md) | Hosted Postgres + Auth |
-| [guides/backend-setup.md](guides/backend-setup.md) | FastAPI + Alembic commands |
-| [guides/frontend-setup.md](guides/frontend-setup.md) | Vite + React scaffold commands |
+| [guides/supabase-setup.md](guides/supabase-setup.md) | Hosted Postgres + Auth + pgvector setup |
+| [guides/backend-setup.md](guides/backend-setup.md) | FastAPI + Alembic commands and environment |
+| [guides/frontend-setup.md](guides/frontend-setup.md) | Vite + React scaffold commands and config |

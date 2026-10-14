@@ -1,8 +1,20 @@
-# Backend
+# Backend — Document Assistant
 
-FastAPI service for Document Assistant. Python 3.12+ and [uv](https://docs.astral.sh/uv/) required.
+FastAPI service for **Document Assistant**, providing grounded SEC 10-K search, citation verification, and real-time streaming for equity research analysts. Python 3.12+ and [uv](https://docs.astral.sh/uv/) required.
 
-## Setup
+---
+
+## Subsystem Architecture & Documentation
+
+The backend is organized into specialized engines with dedicated documentation:
+
+- [Assistant Reasoning Engine (`app/assistant/README.md`)](app/assistant/README.md): PydanticAI agent orchestrator, system prompt contract, tool definitions, and SSE streaming pipeline.
+- [Grounding Safety Engine (`app/grounding/README.md`)](app/grounding/README.md): Automated citation validator enforcing fail-closed hallucination rejection and refusal boundaries.
+- [Retrieval Engine (`app/retrieval/README.md`)](app/retrieval/README.md): Local dense vector search (BGE-768 on MPS), full-text Postgres search, Reciprocal Rank Fusion (RRF), and context window expansion.
+
+---
+
+## Setup & Running
 
 ```bash
 cd backend
@@ -10,26 +22,41 @@ cp .env.example .env   # fill in real values
 uv sync
 ```
 
-Env vars are loaded by `app/config.py`. Do not call `os.getenv` or `load_dotenv` in app code.
+Configuration is managed centrally in `app/config.py`.
 
-## Run
-
-```bash
-uv run uvicorn app.main:app --reload
-```
-
-Or: `uv run python app/main.py`
-
-- API: http://127.0.0.1:8000
-- Health: http://127.0.0.1:8000/health
-- Docs: http://127.0.0.1:8000/docs
-
-## Dependencies
+### Run Development Server
 
 ```bash
-uv add <package>           # runtime
-uv add --dev <package>     # test / lint
-uv sync                    # install from lockfile
+uv run uvicorn app.main:app --reload --port 8000
 ```
 
-More setup and migration notes: [docs/guides/backend-setup.md](../docs/guides/backend-setup.md).
+- API Base: `http://127.0.0.1:8000`
+- Health check: `http://127.0.0.1:8000/health`
+- OpenAPI Swagger docs: `http://127.0.0.1:8000/docs`
+
+---
+
+## Database Migrations
+
+Managed via Alembic against Supabase PostgreSQL:
+
+```bash
+uv run alembic upgrade head
+```
+
+---
+
+## Verification & Testing
+
+```bash
+# Run complete test suite (54 tests)
+uv run pytest tests/ -v
+
+# Run client-brief 10-question smoke test runner
+uv run python scripts/smoke_test_client_brief.py --quick
+
+# Run retrieval verification
+uv run python scripts/verify_retrieval.py
+```
+
+More setup and migration details: [docs/guides/backend-setup.md](../docs/guides/backend-setup.md).

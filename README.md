@@ -174,3 +174,22 @@ npm run build --prefix frontend
 - **Authentication**: All endpoints require a valid Supabase Auth JWT passed via `Authorization: Bearer <token>`.
 - **Row-Level Isolation**: Supabase Postgres RLS policies and FastAPI route checks verify `thread.user_id == current_user.id`. Any unauthorized thread access fails fast with `403 Forbidden`.
 - **Auditing**: Request latency, caller ID, and failover diagnostics are logged via `structlog`.
+
+---
+
+## Documentation Index & Quick Reference
+
+| Document | Purpose |
+| --- | --- |
+| [Client Brief](docs/client-brief.md) | Meridian Research requirements, target users, and 10 representative test questions |
+| [Architecture Specification](docs/architecture.md) | System design, database schema, data flow, and SSE streaming protocol |
+| [Backend Guide](backend/README.md) | FastAPI service setup, environment variables, database migrations, and testing |
+| [Assistant Reasoning Engine](backend/app/assistant/README.md) | PydanticAI agent orchestrator, system prompt contract, tool calling, and streaming |
+| [Grounding Safety Engine](backend/app/grounding/README.md) | Grounding safety validator, citation verification, and fail-closed refusal contract |
+| [Hybrid Retrieval Engine](backend/app/retrieval/README.md) | Dense BGE vector search, Postgres full-text search, RRF fusion, and window expansion |
+| [Frontend Guide](frontend/README.md) | Vite + React client, message stream, citation drawers, and theme toggle |
+| [Data Ingestion Pipeline](data/README.md) | SEC EDGAR corpus fetching, HTML table cleaner, Docling conversion, and vector indexing |
+| [Supabase Setup Guide](docs/guides/supabase-setup.md) | Hosted Postgres, pgvector extension, Auth configuration, and RLS policies |
+| [Backend Setup Guide](docs/guides/backend-setup.md) | Step-by-step FastAPI virtualenv and Alembic commands |
+| [Frontend Setup Guide](docs/guides/frontend-setup.md) | Vite + React scaffold and styling setup |
+| [Implementation Roadmap](docs/todos.md) | Progress checklist across Phases 1 through 9 |
