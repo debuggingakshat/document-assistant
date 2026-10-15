@@ -45,6 +45,16 @@ async def logging_middleware(request: Request, call_next):
 app.include_router(chat_router)
 
 
+@app.get("/")
+async def root() -> dict[str, str]:
+    return {
+        "service": "Document Assistant Backend API",
+        "status": "online",
+        "docs": "/docs",
+        "health": "/health",
+    }
+
+
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}

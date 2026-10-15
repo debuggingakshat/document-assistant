@@ -176,29 +176,43 @@ Goal: 5 senior analysts can use it for a week and report ≥3 hours saved per an
 
 ---
 
-## Phase 9 — Deployment (Vercel + Hugging Face Spaces)
+## Phase 9 — Deployment (Vercel + Render)
 
-Goal: 100% free production deployment with high-performance global CDN for frontend and 16 GB RAM for backend ML embeddings.
+Goal: 100% free production deployment with global CDN for frontend (Vercel) and 512 MB Free Web Service for backend (Render), powered by Google AI Studio 768-dim Embeddings (<100 MB RAM).
 
 ### Frontend Deployment (Vercel)
 - [x] Create `frontend/vercel.json` with SPA route rewrites to prevent 404s on page refresh
-- [ ] Connect GitHub repository to Vercel with Root Directory set to `frontend`
-- [ ] Set frontend environment variables (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_API_BASE_URL`)
-- [ ] Deploy Vite build to Vercel production CDN
-- [ ] Verify frontend authentication pages (`/login`, `/signup`) and route guards on live URL
+- [x] Connect GitHub repository to Vercel with Root Directory set to `frontend`
+- [x] Set frontend environment variables (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_API_BASE_URL`)
+- [x] Deploy Vite build to Vercel production CDN (`https://document-assistant-black.vercel.app`)
+- [x] Add Meridian Research branding, logo, and theme toggle to auth pages (`/login`, `/signup`)
+- [x] Configure Supabase Auth Redirect URLs to allow Vercel domain
 
-### Backend Deployment (Hugging Face Spaces)
-- [ ] Configure `backend/Dockerfile` with Python 3.12, `uv`, dependencies, and port 7860
-- [ ] Add CORS `ALLOWED_ORIGINS` in backend configuration for the Vercel production domain
-- [ ] Create a new Docker Space on Hugging Face (16 GB RAM free tier)
-- [ ] Add encrypted Space secrets (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `GOOGLE_API_KEY`, etc.)
-- [ ] Sync/deploy backend to Hugging Face Space
-- [ ] Verify backend `/health` endpoint and OpenAPI docs on live `.hf.space` domain
+### Backend Optimization (Google API 768-dim Embeddings)
+- [x] Remove PyTorch (`torch`, `sentence-transformers`) and ONNX from `backend/pyproject.toml`
+- [x] Add `google-genai` to dependencies and delete local cached model weights (~450MB SSD reclaimed)
+- [ ] Implement `GoogleEmbedder` in `backend/ingest/embedder.py` using `gemini-embedding-001` (output_dimensionality=768)
+- [ ] Update `backend/app/retrieval/retriever.py` to use `GoogleEmbedder`
+- [ ] Verify memory footprint stays under ~90 MB (safely below Render 512 MB ceiling)
+
+### Database Reset & Re-Ingestion
+- [ ] Wipe test data from Supabase (`chat_threads`, `chat_messages`, `message_citations`)
+- [ ] Wipe old 768-dim BGE vectors from `document_chunks` (keeping `source_documents` intact)
+- [ ] Re-ingest all 25 filings via `pipeline.py --force` with Google 768-dim embeddings (~2-3 mins)
+- [ ] Verify hybrid retrieval and vector consistency (`verify_retrieval.py`)
+- [ ] Run automated pytest suite (54 tests) and client-brief smoke tests
+
+### Backend Deployment (Render)
+- [x] Add CORS `ALLOWED_ORIGINS` in backend configuration for `https://document-assistant-black.vercel.app`
+- [x] Add root discovery endpoint (`/`) and health check (`/health`)
+- [ ] Create free Web Service on Render from GitHub repository (`Root Directory: backend`)
+- [ ] Set Build Command (`pip install uv && uv sync --frozen --no-dev`) and Start Command (`uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT`)
+- [ ] Add Render environment variables (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `GOOGLE_API_KEY`, etc.)
+- [ ] Deploy and verify backend `/health` and `/docs` on live Render URL
 
 ### Integration & Verification
-- [ ] Update Vercel `VITE_API_BASE_URL` with the live Hugging Face Space URL
-- [ ] Add Vercel URL to Supabase Auth -> Redirect URLs / Allowed Web Origins
-- [ ] End-to-end test on deployed URLs: user login, chat streaming, citation inspection drawer, and financial tables
+- [ ] Update Vercel `VITE_API_BASE_URL` with the live Render backend URL
+- [ ] End-to-end test on deployed URLs: analyst login, chat streaming, citation inspection drawer, and financial tables
 
 ---
 
