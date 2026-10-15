@@ -217,6 +217,12 @@ Goal: 100% free production deployment with global CDN for frontend (Vercel) and 
 - [x] Add multi-turn directives to `instructions.md` for narrative continuity and metric consistency
 - [x] Add automated unit test `test_multi_turn_ticker_inheritance` (55/55 tests passing)
 
+### Scope Boundaries & Educational Concept Handling
+- [x] Refactor Directive 4 in `instructions.md` into 3 distinct categories: Trading Advice Refusal, Coverage Universe Boundary, and Educational Financial Concepts
+- [x] Add Category C educational bridge: define corporate finance concepts (e.g., capital budgeting, EBITDA, WACC) and bridge to 10-K sections (MD&A Item 7, Cash Flow Statement CapEx)
+- [x] Update `GroundedAnswer` schema in `schemas.py` to clarify that educational conceptual definitions do not trigger refusal flags
+- [x] Add automated unit tests in `test_validator.py` and `test_orchestrator.py` verifying educational responses pass validation and stream cleanly (58/58 tests passing)
+
 ### Integration & Verification
 - [x] Update Vercel `VITE_API_BASE_URL` with the live Render backend URL (`https://document-assistant-backend-om3b.onrender.com`)
 - [x] Deploy frontend to Vercel production CDN (`https://document-assistant-black.vercel.app`)

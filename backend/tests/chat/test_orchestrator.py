@@ -198,3 +198,53 @@ async def test_multi_turn_ticker_inheritance() -> None:
     # Verify agent.run received conversation history
     run_call_kwargs = mock_agent.run.call_args.kwargs
     assert "Apple revenue was $391,035M" in run_call_kwargs["deps"].conversation_history
+
+
+@pytest.mark.anyio
+async def test_stream_educational_concept_query() -> None:
+    """Verifies that general educational finance concepts stream correctly without requiring citations."""
+    thread_id = uuid.uuid4()
+
+    mock_client = MagicMock()
+    mock_client.table().select().eq().order().execute.return_value = MagicMock(data=[])
+    mock_user_msg = {"id": str(uuid.uuid4())}
+    mock_asst_msg = {"id": str(uuid.uuid4())}
+    mock_client.table().insert().execute.side_effect = [
+        MagicMock(data=[mock_user_msg]),
+        MagicMock(data=[mock_asst_msg]),
+    ]
+
+    mock_retriever = MagicMock()
+    mock_retriever.retrieve.return_value = []
+
+    mock_agent = MagicMock()
+    concept_answer = GroundedAnswer(
+        answer=(
+            "**Capital budgeting** is the corporate planning process used to evaluate long-term capital investments. "
+            "In SEC 10-K filings, these appear under Capital Expenditures in the Statement of Cash Flows. "
+            "Would you like to examine CapEx disclosures for Apple, Amazon, Alphabet, Microsoft, or NVIDIA?"
+        ),
+        citations=[],
+        has_sufficient_evidence=True,
+        refusal_reason=None,
+    )
+    mock_agent_result = MagicMock()
+    mock_agent_result.output = concept_answer
+    mock_agent.run = AsyncMock(return_value=mock_agent_result)
+
+    chunks = []
+    async for s in stream_orchestrated_turn(
+        client=mock_client,
+        thread_id=thread_id,
+        user_content="What is capital budgeting?",
+        retriever=mock_retriever,
+        agent_override=mock_agent,
+    ):
+        chunks.append(s)
+
+    full_stream = "".join(chunks)
+    assert '0:"**Capital' in full_stream
+    assert '0:"Capital ' in full_stream and '0:"Expenditures ' in full_stream
+    assert 'd:{"finishReason": "stop"' in full_stream
+    # No citations data part should be emitted when citations list is empty
+    assert '2:[{"type": "citations"' not in full_stream

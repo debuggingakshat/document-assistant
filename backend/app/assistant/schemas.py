@@ -40,5 +40,5 @@ class GroundedAnswer(BaseModel):
     )
     refusal_reason: str | None = Field(
         default=None,
-        description="Set if the request was refused due to scope (e.g. stock advice, ungrounded speculation).",
+        description="Set if the request was refused due to scope (e.g. stock advice or non-coverage entity). Leave None for conceptual financial definitions.",
     )

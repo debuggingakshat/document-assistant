@@ -155,3 +155,60 @@ def test_refusal_or_insufficient_evidence() -> None:
 
     assert res.is_valid is True
     assert len(res.errors) == 0
+
+
+def test_educational_financial_concept_answer() -> None:
+    """General corporate finance concept questions with no citations should validate cleanly."""
+    answer = GroundedAnswer(
+        answer=(
+            "**Capital budgeting** is the process corporate management uses to evaluate, plan, "
+            "and prioritize long-term capital investments such as property, plant, and equipment (PPE). "
+            "In SEC 10-K filings, these appear under Capital Expenditures in the Statement of Cash Flows."
+        ),
+        citations=[],
+        has_sufficient_evidence=True,
+        refusal_reason=None,
+    )
+
+    validator = GroundingValidator(strict=True)
+    res = validator.validate(answer, [])
+
+    assert res.is_valid is True
+    assert len(res.verified_citations) == 0
+    assert len(res.invalid_citations) == 0
+    assert len(res.errors) == 0
+
+
+def test_educational_concept_with_coverage_bridge_citation() -> None:
+    """An educational response that cites a specific 10-K example should verify the citation."""
+    p = _make_passage(
+        ticker="MSFT",
+        fiscal_year=2024,
+        text="Cash payments for property and equipment were $44,484 million in fiscal 2024.",
+    )
+
+    answer = GroundedAnswer(
+        answer=(
+            "Capital budgeting decisions appear as Capital Expenditures. For example, in FY2024, "
+            "Microsoft reported $44,484 million in additions to property and equipment [^1]."
+        ),
+        citations=[
+            CitationItem(
+                chunk_id=p.chunk_id,
+                citation_label="[^1]",
+                ticker="MSFT",
+                fiscal_year=2024,
+                snippet="$44,484 million",
+            )
+        ],
+        has_sufficient_evidence=True,
+        refusal_reason=None,
+    )
+
+    validator = GroundingValidator(strict=True)
+    res = validator.validate(answer, [p])
+
+    assert res.is_valid is True
+    assert len(res.verified_citations) == 1
+    assert len(res.invalid_citations) == 0
+    assert len(res.errors) == 0
