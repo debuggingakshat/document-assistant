@@ -40,7 +40,18 @@ class Settings(BaseSettings):
     @classmethod
     def parse_allowed_origins(cls, value: object) -> object:
         if isinstance(value, str):
-            return [origin.strip() for origin in value.split(",") if origin.strip()]
+            val = value.strip()
+            if val.startswith("[") and val.endswith("]"):
+                try:
+                    import json
+                    parsed = json.loads(val)
+                    if isinstance(parsed, list):
+                        return [str(o).strip().strip("'").strip('"').rstrip("/") for o in parsed if str(o).strip()]
+                except Exception:
+                    pass
+            return [origin.strip().strip("[]").strip("'").strip('"').rstrip("/") for origin in val.split(",") if origin.strip()]
+        if isinstance(value, list):
+            return [str(o).strip().rstrip("/") for o in value if str(o).strip()]
         return value
 
 
