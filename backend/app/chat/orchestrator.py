@@ -21,7 +21,7 @@ from app.chat.streaming import (
     format_ai_sdk_status_part,
     format_ai_sdk_text_part,
 )
-from app.database.chats import get_thread, save_citations, save_message, update_thread
+from app.database.chats import get_thread, list_messages, save_citations, save_message, update_thread
 from app.grounding.validator import GroundingValidator, ValidationResult
 from app.retrieval.models import RetrievedPassage
 from app.retrieval.retriever import Retriever
@@ -355,7 +355,42 @@ async def stream_orchestrated_turn(
         model=get_llm_model(model_name) if model_name else None
     )
 
+    # 0. Multi-turn conversation memory: Fetch prior messages in thread
+    history_records = list_messages(client=client, thread_id=thread_id)
+    prior_messages = [
+        m for m in history_records
+        if m.get("content") and m.get("content").strip() != user_content.strip()
+    ][-6:]
+
     ticker, fiscal_year = _extract_ticker_and_fy(user_content)
+
+    # Inherit company ticker from recent thread history if not explicitly stated in follow-up
+    inherited_ticker = False
+    if not ticker and prior_messages:
+        for prev_msg in reversed(prior_messages):
+            prev_ticker, _ = _extract_ticker_and_fy(prev_msg.get("content", ""))
+            if prev_ticker:
+                ticker = prev_ticker
+                inherited_ticker = True
+                logger.info(
+                    "Inherited active ticker '%s' from conversation history in thread %s",
+                    ticker,
+                    thread_id,
+                )
+                break
+
+    # Build formatted conversation history for LLM prompt context
+    conversation_history_str = ""
+    if prior_messages:
+        formatted_turns = []
+        for m in prior_messages:
+            role = "User" if m.get("role") == "user" else "Assistant"
+            text_snippet = m.get("content", "").strip()
+            # Truncate older assistant turns to ~350 chars to conserve prompt token budget
+            if role == "Assistant" and len(text_snippet) > 350:
+                text_snippet = text_snippet[:350] + "..."
+            formatted_turns.append(f"[{role}]: {text_snippet}")
+        conversation_history_str = "\n".join(formatted_turns)
 
     # Kick off background title generation if thread is untitled
     title_task: asyncio.Task[str | None] | None = None
@@ -381,6 +416,7 @@ async def stream_orchestrated_turn(
             "concurrency": "ThreadPoolExecutor (2 workers)",
             "filter_ticker": ticker or "All Filings",
             "filter_fy": fiscal_year or "All Years",
+            "conversation_memory": f"{len(prior_messages)} prior turns" if prior_messages else "New Session",
         },
     )
 
@@ -398,14 +434,19 @@ async def stream_orchestrated_turn(
         user_msg_id = uuid.UUID(str(user_msg["id"]))
 
     # 2. Extract heuristics and run Phase 5 hybrid retrieval
+    retrieval_query = user_content
+    if inherited_ticker and ticker and ticker not in user_content.upper():
+        retrieval_query = f"{user_content} ({ticker})"
+
     logger.info(
-        "Executing retrieval: query='%s', ticker=%s, fy=%s",
-        user_content,
+        "Executing retrieval: query='%s', ticker=%s, fy=%s (history_turns=%d)",
+        retrieval_query,
         ticker,
         fiscal_year,
+        len(prior_messages),
     )
     initial_passages = retriever.retrieve(
-        query=user_content,
+        query=retrieval_query,
         ticker=ticker,
         fiscal_year=fiscal_year,
         top_n=5,
@@ -428,6 +469,7 @@ async def stream_orchestrated_turn(
     deps = DocumentAgentDeps(
         retriever=retriever,
         initial_passages=initial_passages,
+        conversation_history=conversation_history_str,
     )
 
     active_llm_name = model_name or "gemini-2.5-flash"

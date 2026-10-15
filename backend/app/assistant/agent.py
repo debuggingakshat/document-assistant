@@ -24,6 +24,7 @@ class DocumentAgentDeps:
     retriever: Retriever
     initial_passages: list[RetrievedPassage] = field(default_factory=list)
     all_retrieved_passages: list[RetrievedPassage] = field(default_factory=list)
+    conversation_history: str = ""
 
     def __post_init__(self) -> None:
         if self.initial_passages and not self.all_retrieved_passages:
@@ -53,22 +54,35 @@ def create_document_agent(
 
     @agent.system_prompt
     def format_retrieved_context(ctx: RunContext[DocumentAgentDeps]) -> str:
-        """Inject initial retrieved passages directly into the prompt context."""
-        if not ctx.deps.initial_passages:
-            return "No pre-retrieved passages available. Use the `search_filings` tool to search."
+        """Inject conversation history and retrieved source passages into the prompt context."""
+        sections = []
 
-        lines = [
-            "--- RETRIEVED SOURCE PASSAGES IN CONTEXT ---",
-            "Use these source passages to construct your answer. Every passage is numbered and has a Chunk ID.",
-        ]
-        for i, p in enumerate(ctx.deps.initial_passages, start=1):
-            table_badge = " [FINANCIAL TABLE]" if p.is_table else ""
-            lines.append(
-                f"\n[Passage [^{i}] | Chunk ID: {p.chunk_id} | {p.citation_source}{table_badge}]\n"
-                f"{p.full_context_text}"
+        if ctx.deps.conversation_history:
+            sections.append(
+                "--- PRIOR CONVERSATION HISTORY (RECENT TURNS IN THIS THREAD) ---\n"
+                f"{ctx.deps.conversation_history}\n"
+                "--- END CONVERSATION HISTORY ---\n"
+                "Use prior turns to resolve follow-up questions, pronouns ('they', 'that', 'those margins'), and comparisons. "
+                "Always cite new source passages from below for newly introduced facts."
             )
-        lines.append("\n--- END OF PASSAGES ---")
-        return "\n".join(lines)
+
+        if not ctx.deps.initial_passages:
+            sections.append("No pre-retrieved passages available. Use the `search_filings` tool to search.")
+        else:
+            lines = [
+                "--- RETRIEVED SOURCE PASSAGES IN CONTEXT ---",
+                "Use these source passages to construct your answer. Every passage is numbered and has a Chunk ID.",
+            ]
+            for i, p in enumerate(ctx.deps.initial_passages, start=1):
+                table_badge = " [FINANCIAL TABLE]" if p.is_table else ""
+                lines.append(
+                    f"\n[Passage [^{i}] | Chunk ID: {p.chunk_id} | {p.citation_source}{table_badge}]\n"
+                    f"{p.full_context_text}"
+                )
+            lines.append("\n--- END OF PASSAGES ---")
+            sections.append("\n".join(lines))
+
+        return "\n\n".join(sections)
 
     @agent.tool
     async def search_filings(

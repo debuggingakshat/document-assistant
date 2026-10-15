@@ -210,6 +210,13 @@ Goal: 100% free production deployment with global CDN for frontend (Vercel) and 
 - [x] Add Render environment variables (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`, etc.)
 - [x] Deploy and verify backend `/health` and `/docs` on live Render URL (`https://document-assistant-backend-om3b.onrender.com`)
 
+### Multi-Turn Conversational Memory
+- [x] Fetch recent thread dialogue turns (up to 6 messages) from Supabase via `chats.list_messages`
+- [x] Implement active ticker/entity inheritance for follow-up questions omitting company names
+- [x] Inject `--- PRIOR CONVERSATION HISTORY ---` directly into PydanticAI agent context (`agent.py`)
+- [x] Add multi-turn directives to `instructions.md` for narrative continuity and metric consistency
+- [x] Add automated unit test `test_multi_turn_ticker_inheritance` (55/55 tests passing)
+
 ### Integration & Verification
 - [x] Update Vercel `VITE_API_BASE_URL` with the live Render backend URL (`https://document-assistant-backend-om3b.onrender.com`)
 - [x] Deploy frontend to Vercel production CDN (`https://document-assistant-black.vercel.app`)

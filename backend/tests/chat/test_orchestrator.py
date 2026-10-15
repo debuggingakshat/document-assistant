@@ -147,3 +147,54 @@ async def test_stream_orchestrated_turn() -> None:
     assert '0:"Apple' in full_stream
     assert '2:[{"type": "citations"' in full_stream
     assert 'd:{"finishReason": "stop"' in full_stream
+
+
+@pytest.mark.anyio
+async def test_multi_turn_ticker_inheritance() -> None:
+    """Verifies that follow-up questions inherit the active ticker and context from previous turns."""
+    thread_id = uuid.uuid4()
+    chunk_id = uuid.uuid4()
+    passage = _mock_passage(chunk_id)
+
+    mock_client = MagicMock()
+    # Mock previous messages in thread: Turn 1 was about Apple (AAPL)
+    prev_user = {"role": "user", "content": "What was Apple revenue in 2024?"}
+    prev_asst = {"role": "assistant", "content": "Apple revenue was $391,035M [^1]."}
+    mock_client.table().select().eq().order().execute.return_value = MagicMock(
+        data=[prev_user, prev_asst]
+    )
+    mock_client.table().insert().execute.side_effect = [
+        MagicMock(data=[{"id": str(uuid.uuid4())}]),
+        MagicMock(data=[{"id": str(uuid.uuid4())}]),
+        MagicMock(data=[{"id": str(uuid.uuid4())}]),
+    ]
+
+    mock_retriever = MagicMock()
+    mock_retriever.retrieve.return_value = [passage]
+
+    mock_agent = MagicMock()
+    answer = GroundedAnswer(
+        answer="Comparing to 2023, Apple had lower growth [^1].",
+        citations=[CitationItem(chunk_id=chunk_id, citation_label="[^1]", ticker="AAPL", fiscal_year=2023)],
+        has_sufficient_evidence=True,
+    )
+    mock_agent_result = MagicMock()
+    mock_agent_result.output = answer
+    mock_agent.run = AsyncMock(return_value=mock_agent_result)
+
+    # User asks follow-up with no company name: "How does that compare to 2023?"
+    async for _ in stream_orchestrated_turn(
+        client=mock_client,
+        thread_id=thread_id,
+        user_content="How does that compare to 2023?",
+        retriever=mock_retriever,
+        agent_override=mock_agent,
+    ):
+        pass
+
+    # Verify retriever inherited AAPL ticker
+    call_kwargs = mock_retriever.retrieve.call_args.kwargs
+    assert call_kwargs["ticker"] == "AAPL"
+    # Verify agent.run received conversation history
+    run_call_kwargs = mock_agent.run.call_args.kwargs
+    assert "Apple revenue was $391,035M" in run_call_kwargs["deps"].conversation_history
