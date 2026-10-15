@@ -158,7 +158,7 @@ def run_pipeline(
         # 5. Full run: Batch embeddings
         texts = [c["chunk_text"] for c in chunks]
         logger.info("Generating embeddings for %d chunks in batches...", len(texts))
-        embeddings = embedder.embed_batch(texts, batch_size=50)
+        embeddings = embedder.embed_batch(texts, batch_size=10)
 
         # 6. Batch insert into Supabase
         db_rows: list[dict[str, Any]] = []
@@ -182,6 +182,7 @@ def run_pipeline(
 
         total_chunks_inserted += len(db_rows)
         logger.info("Inserted %d chunks for %s %d (running total: %d)", len(db_rows), doc_ticker, year, total_chunks_inserted)
+        time.sleep(0.5)
 
     elapsed = time.time() - start_time
     logger.info("Ingestion finished in %.2fs. Total chunks inserted: %d", elapsed, total_chunks_inserted)

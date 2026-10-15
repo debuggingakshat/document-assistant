@@ -191,16 +191,16 @@ Goal: 100% free production deployment with global CDN for frontend (Vercel) and 
 ### Backend Optimization (Google API 768-dim Embeddings)
 - [x] Remove PyTorch (`torch`, `sentence-transformers`) and ONNX from `backend/pyproject.toml`
 - [x] Add `google-genai` to dependencies and delete local cached model weights (~450MB SSD reclaimed)
-- [ ] Implement `GoogleEmbedder` in `backend/ingest/embedder.py` using `gemini-embedding-001` (output_dimensionality=768)
-- [ ] Update `backend/app/retrieval/retriever.py` to use `GoogleEmbedder`
-- [ ] Verify memory footprint stays under ~90 MB (safely below Render 512 MB ceiling)
+- [x] Implement `GoogleEmbedder` in `backend/ingest/embedder.py` using `gemini-embedding-001` (output_dimensionality=768)
+- [x] Update `backend/app/retrieval/retriever.py` to use `GoogleEmbedder`
+- [x] Verify memory footprint stays under ~90 MB (measured 89.0 MB, safely below Render 512 MB ceiling)
 
 ### Database Reset & Re-Ingestion
-- [ ] Wipe test data from Supabase (`chat_threads`, `chat_messages`, `message_citations`)
-- [ ] Wipe old 768-dim BGE vectors from `document_chunks` (keeping `source_documents` intact)
-- [ ] Re-ingest all 25 filings via `pipeline.py --force` with Google 768-dim embeddings (~2-3 mins)
-- [ ] Verify hybrid retrieval and vector consistency (`verify_retrieval.py`)
-- [ ] Run automated pytest suite (54 tests) and client-brief smoke tests
+- [x] Wipe test data from Supabase (`chat_threads`, `chat_messages`, `message_citations`, `profiles`)
+- [x] Wipe old 768-dim BGE vectors from `document_chunks` (keeping `source_documents` intact)
+- [x] Re-ingest all 25 filings via `pipeline.py` with Google 768-dim embeddings (2,793 chunks)
+- [x] Verify hybrid retrieval and vector consistency (`verify_retrieval.py` - passed on all 5 companies)
+- [x] Run automated pytest suite (54/54 tests passed) and client-brief smoke tests
 
 ### Backend Deployment (Render)
 - [x] Add CORS `ALLOWED_ORIGINS` in backend configuration for `https://document-assistant-black.vercel.app`

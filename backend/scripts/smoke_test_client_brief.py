@@ -166,10 +166,10 @@ async def run_single_question(
         )
         refusal_pass = causality_refused
 
-    passed = (
-        len(val.verified_citations) > 0
-        and (not q.check_refusal or refusal_pass)
-    )
+    if q.check_refusal:
+        passed = refusal_pass and len(val.invalid_citations) == 0
+    else:
+        passed = len(val.verified_citations) > 0
 
     print(f"Completed in {total_dur:.2f}s (Retrieval: {retrieval_dur:.2f}s, LLM: {llm_dur:.2f}s)")
     print(f"Verified Citations: {len(val.verified_citations)} | Invalid: {len(val.invalid_citations)}")
