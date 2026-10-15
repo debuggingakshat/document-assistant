@@ -205,13 +205,14 @@ Goal: 100% free production deployment with global CDN for frontend (Vercel) and 
 ### Backend Deployment (Render)
 - [x] Add CORS `ALLOWED_ORIGINS` in backend configuration for `https://document-assistant-black.vercel.app`
 - [x] Add root discovery endpoint (`/`) and health check (`/health`)
-- [ ] Create free Web Service on Render from GitHub repository (`Root Directory: backend`)
-- [ ] Set Build Command (`pip install uv && uv sync --frozen --no-dev`) and Start Command (`uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT`)
-- [ ] Add Render environment variables (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `GOOGLE_API_KEY`, etc.)
-- [ ] Deploy and verify backend `/health` and `/docs` on live Render URL
+- [x] Create free Web Service on Render from GitHub repository (`Root Directory: backend`)
+- [x] Set Build Command (`pip install uv && uv sync --frozen --no-dev`) and Start Command (`.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port $PORT`)
+- [x] Add Render environment variables (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`, etc.)
+- [x] Deploy and verify backend `/health` and `/docs` on live Render URL (`https://document-assistant-backend-om3b.onrender.com`)
 
 ### Integration & Verification
-- [ ] Update Vercel `VITE_API_BASE_URL` with the live Render backend URL
+- [x] Update Vercel `VITE_API_BASE_URL` with the live Render backend URL (`https://document-assistant-backend-om3b.onrender.com`)
+- [x] Deploy frontend to Vercel production CDN (`https://document-assistant-black.vercel.app`)
 - [ ] End-to-end test on deployed URLs: analyst login, chat streaming, citation inspection drawer, and financial tables
 
 ---
