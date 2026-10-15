@@ -224,7 +224,7 @@ export function PipelineStatusIndicator({
           </div>
           <ul className="space-y-1 text-[10.5px] text-muted-foreground">
             <li>
-              • <strong className="text-foreground">Embedding Model</strong>: <span className="text-primary">BAAI/bge-base-en-v1.5</span> (768 dimensions, cosine similarity)
+              • <strong className="text-foreground">Embedding Model</strong>: <span className="text-primary">Google gemini-embedding-001</span> (768 dimensions, cosine similarity)
             </li>
             <li>
               • <strong className="text-foreground">FTS Query Engine</strong>: PostgreSQL <span className="text-primary">websearch_to_tsquery</span> with salient keyword extractor & <span className="text-primary">ts_rank_cd</span>

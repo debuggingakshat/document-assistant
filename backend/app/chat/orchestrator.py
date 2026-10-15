@@ -373,9 +373,9 @@ async def stream_orchestrated_turn(
     yield format_ai_sdk_status_part(
         stage="searching",
         title="Concurrent Hybrid Retrieval (FTS + pgvector)",
-        message="Embedding query via bge-base-en-v1.5 (768-d). Executing parallel tsvector FTS & pgvector cosine similarity search (<=>) in ThreadPoolExecutor...",
+        message="Embedding query via Google gemini-embedding-001 (768-d). Executing parallel tsvector FTS & pgvector cosine similarity search (<=>) in ThreadPoolExecutor...",
         technical_details={
-            "embedding_model": "bge-base-en-v1.5 (MPS/CPU)",
+            "embedding_model": "Google gemini-embedding-001",
             "vector_dim": 768,
             "fts_parser": "websearch_to_tsquery + ts_rank_cd",
             "concurrency": "ThreadPoolExecutor (2 workers)",
