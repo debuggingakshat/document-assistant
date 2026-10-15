@@ -248,3 +248,53 @@ async def test_stream_educational_concept_query() -> None:
     assert 'd:{"finishReason": "stop"' in full_stream
     # No citations data part should be emitted when citations list is empty
     assert '2:[{"type": "citations"' not in full_stream
+
+
+@pytest.mark.anyio
+async def test_stream_non_financial_query_refusal() -> None:
+    """Verifies that non-financial out-of-domain queries stream the specialization refusal without error."""
+    thread_id = uuid.uuid4()
+
+    mock_client = MagicMock()
+    mock_client.table().select().eq().order().execute.return_value = MagicMock(data=[])
+    mock_user_msg = {"id": str(uuid.uuid4())}
+    mock_asst_msg = {"id": str(uuid.uuid4())}
+    mock_client.table().insert().execute.side_effect = [
+        MagicMock(data=[mock_user_msg]),
+        MagicMock(data=[mock_asst_msg]),
+    ]
+
+    mock_retriever = MagicMock()
+    mock_retriever.retrieve.return_value = []
+
+    mock_agent = MagicMock()
+    refusal_answer = GroundedAnswer(
+        answer=(
+            "As Meridian Research's Document Assistant, I specialize exclusively in institutional equity research, "
+            "SEC 10-K filing analysis, and corporate finance/accounting concepts. I cannot assist with non-financial topics "
+            "such as psychology. Please feel free to ask questions regarding corporate finance or SEC 10-K disclosures "
+            "for our coverage universe (AAPL, AMZN, GOOGL, MSFT, and NVDA)."
+        ),
+        citations=[],
+        has_sufficient_evidence=False,
+        refusal_reason="Out of domain: non-financial topic",
+    )
+    mock_agent_result = MagicMock()
+    mock_agent_result.output = refusal_answer
+    mock_agent.run = AsyncMock(return_value=mock_agent_result)
+
+    chunks = []
+    async for s in stream_orchestrated_turn(
+        client=mock_client,
+        thread_id=thread_id,
+        user_content="What are the stages of psychological grief?",
+        retriever=mock_retriever,
+        agent_override=mock_agent,
+    ):
+        chunks.append(s)
+
+    full_stream = "".join(chunks)
+    assert '0:"As ' in full_stream or '0:"As' in full_stream
+    assert "psychology" in full_stream
+    assert 'd:{"finishReason": "stop"' in full_stream
+    assert '2:[{"type": "citations"' not in full_stream

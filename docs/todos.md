@@ -218,10 +218,11 @@ Goal: 100% free production deployment with global CDN for frontend (Vercel) and 
 - [x] Add automated unit test `test_multi_turn_ticker_inheritance` (55/55 tests passing)
 
 ### Scope Boundaries & Educational Concept Handling
-- [x] Refactor Directive 4 in `instructions.md` into 3 distinct categories: Trading Advice Refusal, Coverage Universe Boundary, and Educational Financial Concepts
-- [x] Add Category C educational bridge: define corporate finance concepts (e.g., capital budgeting, EBITDA, WACC) and bridge to 10-K sections (MD&A Item 7, Cash Flow Statement CapEx)
-- [x] Update `GroundedAnswer` schema in `schemas.py` to clarify that educational conceptual definitions do not trigger refusal flags
-- [x] Add automated unit tests in `test_validator.py` and `test_orchestrator.py` verifying educational responses pass validation and stream cleanly (58/58 tests passing)
+- [x] Refactor Directive 4 in `instructions.md` into 4 distinct categories: Trading Advice Refusal, Coverage Universe Boundary, Finance & Accounting Concepts Only, and Non-Financial Topic Refusal
+- [x] Add Category C educational bridge: define corporate finance concepts (e.g., capital budgeting, EBITDA, WACC, ASC 606) and bridge to 10-K sections (MD&A Item 7, Cash Flow Statement CapEx)
+- [x] Add Category D domain boundary: strictly refuse non-financial subjects (history, psychology, medical, pop culture) and redirect user to finance and 10-K research
+- [x] Update `GroundedAnswer` schema in `schemas.py` to clarify that corporate finance definitions do not trigger refusal flags while non-financial topics set domain refusal
+- [x] Add automated unit tests in `test_validator.py` and `test_orchestrator.py` for both finance education and non-financial domain refusals (60/60 tests passing)
 
 ### Integration & Verification
 - [x] Update Vercel `VITE_API_BASE_URL` with the live Render backend URL (`https://document-assistant-backend-om3b.onrender.com`)

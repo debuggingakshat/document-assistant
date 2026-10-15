@@ -212,3 +212,25 @@ def test_educational_concept_with_coverage_bridge_citation() -> None:
     assert len(res.verified_citations) == 1
     assert len(res.invalid_citations) == 0
     assert len(res.errors) == 0
+
+
+def test_non_financial_domain_refusal() -> None:
+    """Non-financial queries (e.g. history, medicine, psychology) should validate cleanly as out-of-domain refusals."""
+    answer = GroundedAnswer(
+        answer=(
+            "As Meridian Research's Document Assistant, I specialize exclusively in institutional equity research, "
+            "SEC 10-K filing analysis, and corporate finance/accounting concepts. I cannot assist with non-financial topics "
+            "such as psychology. Please feel free to ask questions regarding corporate finance or SEC 10-K disclosures."
+        ),
+        citations=[],
+        has_sufficient_evidence=False,
+        refusal_reason="Out of domain: non-financial topic",
+    )
+
+    validator = GroundingValidator(strict=True)
+    res = validator.validate(answer, [])
+
+    assert res.is_valid is True
+    assert len(res.verified_citations) == 0
+    assert len(res.invalid_citations) == 0
+    assert len(res.errors) == 0
