@@ -27,7 +27,7 @@ Document Assistant solves this intake bottleneck by transforming static SEC EDGA
 1. **Deterministic Grounding & Zero-Tolerance Hallucination Policy**: Every single dollar amount, percentage margin, growth rate, and business assertion presented to an analyst must be explicitly tied to a verifiable chunk of an official SEC 10-K filing. If a disclosure does not exist in the filing, the system must deterministically refuse to answer rather than speculate.
 2. **4-Gate Fail-Closed Verification**: Generated responses pass through four programmatic validation gates before reaching the analyst's screen. If any citation UUID is missing, if any ticker entity is mismatched, if any footnote marker is desynchronized, or if any cited quote does not exist verbatim in the source text, the response is blocked.
 3. **100% Free Production Deployment**: The entire full-stack system operates on a zero-cost cloud architecture ($0.00 / ₹0 monthly cost), utilizing generous free tiers from Vercel Edge, Render, Supabase PostgreSQL with `pgvector`, and Google AI Studio.
-4. **High-Availability 2D Waterfall Failover (1,160+ Free Daily Headroom)**: A dual-key and 5-model failover matrix guaranteeing zero user-facing errors or demand warnings. On quota exhaustion, the engine rotates API keys for the selected model first, cascading to fallback models only when both keys are exhausted, scaling free-tier capacity to 1,160+ requests/day at $0.00.
+4. **High-Availability 2D Waterfall Failover (2,160+ Free Daily Headroom)**: A dual-key and 5-model failover matrix guaranteeing zero user-facing errors or demand warnings. On quota exhaustion, the engine rotates API keys for the selected model first, cascading to fallback models only when both keys are exhausted, scaling free-tier capacity to 2,160+ requests/day at $0.00.
 
 ---
 
@@ -509,7 +509,7 @@ The entire full-stack application is deployed and operated across production clo
 | **Frontend CDN** | **Vercel Hobby Edge Network** | Global CDN caching, edge routing, auto-deploys from GitHub `main`. | **$0.00** |
 | **Backend API** | **Render Free Web Service** | Python 3.13 + Uvicorn via `uv`, container memory <80MB, sub-2s health responses. | **$0.00** |
 | **Database & Vectors** | **Supabase Free Tier** | PostgreSQL 15, `pgvector` HNSW indexes, full-text search, Row Level Security. | **$0.00** |
-| **Reasoning & Embeddings** | **Google AI Studio Free Tier** | 2 healthy API keys across 5 models (`gemini-3-flash-preview`, `gemini-3.8-flash`, `gemini-3.1-flash-lite-preview`, `gemini-3.5-flash-lite`, `gemini-flash-lite-latest`) delivering **1,160+ requests/day** with zero-cost failover. | **$0.00** |
+| **Reasoning & Embeddings** | **Google AI Studio Free Tier** | 2 healthy API keys across 5 models (`gemini-3-flash-preview`, `gemini-3.8-flash`, `gemini-3.1-flash-lite-preview`, `gemini-3.5-flash-lite`, `gemini-flash-lite-latest`) delivering **2,160+ requests/day** with zero-cost failover. | **$0.00** |
 | **Test Suite** | **GitHub Actions / Local Pytest** | **64 / 64 unit and integration tests passing** (`pytest backend/tests`). | **$0.00** |
 
 ---
@@ -543,7 +543,7 @@ All **64 / 64 unit and integration tests** will execute and pass, verifying:
 
 ---
 
-## 13. High-Availability Multi-Model & Multi-Key Cascade (1,160+ RPD Architecture)
+## 13. High-Availability Multi-Model & Multi-Key Cascade (2,160+ RPD Architecture)
 
 To ensure zero downtime during peak Google AI Studio traffic and maximize free tier operational capacity without credit card billing, the system implements a **2-Dimensional Multi-Key and Multi-Model Waterfall Engine**:
 
@@ -557,7 +557,7 @@ Google AI Studio allocates rate limits per model per active Google Cloud project
 | `gemini-3.8-flash` (mapped from `gemini-2.0-flash`) | **Gemini 2.0 Flash** | 20 RPD | 40 RPD | Ultra-fast standard response generation. |
 | `gemini-flash-lite-latest` | **Gemini 2.0 Flash Lite** | 20 RPD | 40 RPD | Sub-second lightweight quick answers. |
 | `gemini-3.1-flash-lite-preview` | **Gemini 3.1 Flash Lite** | **500 RPD** | **1,000 RPD** | **High-capacity workhorse tier** ensuring queries never fail. |
-| **Total Daily Capacity** | **Full Coverage Universe** | **580 RPD / Key** | **1,160+ Requests / Day** | **Permanent $0.00 / ₹0 Cloud Footprint** |
+| **Total Daily Capacity** | **Full Coverage Universe** | **580 RPD / Key** | **2,160+ Requests / Day** | **Permanent $0.00 / ₹0 Cloud Footprint** |
 
 ---
 
@@ -590,7 +590,7 @@ User Query Submitted (e.g. Model = Gemini 3 Flash)
 
 #### Key Engineering Invariants of the Waterfall Engine:
 1. **Model Fidelity Invariant**: The system never switches models if the quota error can be resolved simply by rotating the API key. It exhausts Key 1 and Key 2 on the user's selected model first.
-2. **Zero-Error Invariant**: The user is never interrupted with a high-demand warning or retry modal until all 10 combinations (5 models × 2 keys = 1,160+ requests) are exhausted.
+2. **Zero-Error Invariant**: The user is never interrupted with a high-demand warning or retry modal until all 10 combinations (5 models × 2 keys = 2,160+ requests) are exhausted.
 3. **Real-Time Progress Synchronization**: If a cross-model switch occurs, the backend immediately streams a high-priority SSE event (`stage="reasoning"`, `title="Auto-Routed: Gemini 3 Flash → Gemini 3.1 Flash Lite"`) *before* Grounding Verification. The UI progress stepper updates live, informing the analyst of the model transition while the response is being finalized.
 4. **Authentic Provenance Invariant**: The assistant message metadata stores the exact model that synthesized the answer (`asst_metadata = {"model": actual_model_used}`), so the UI message header badge accurately reflects the generating engine.
 
