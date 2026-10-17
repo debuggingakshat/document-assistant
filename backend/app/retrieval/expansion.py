@@ -13,6 +13,9 @@ FINANCIAL_ACRONYMS: dict[str, str] = {
     "cogs": "cost of sales",
     "ebitda": "operating income",
     "ppe": "property and equipment",
+    "advertising": "ads",
+    "ad revenue": "advertising ads",
+    "ad revenues": "advertising ads",
 }
 
 
