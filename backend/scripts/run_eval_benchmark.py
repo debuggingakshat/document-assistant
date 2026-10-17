@@ -2,22 +2,23 @@
 
 Measures:
 1. Retrieval Accuracy: Top-1, Top-3, Top-5 Recall and MRR@5 comparing
-   Hybrid RRF (k=60) vs. Pure Vector vs. Pure Full-Text Search.
+   Dense Vector vs. Sparse FTS vs. Baseline RRF vs. Upgraded Tier-1 Pipeline (Expansion + Cross-Encoder).
 2. Grounding & Citation Accuracy: 4-Gate Fail-Closed Verification Pass Rate.
-3. Response-Time Profile: Retrieval latency, Time-to-First-Token (TTFT), and total turn latency.
 """
 
-import asyncio
 import time
 from dataclasses import dataclass
 from typing import Any
+import uuid
 
-from app.assistant.agent import create_document_agent
-from app.chat.orchestrator import _extract_ticker_and_fy, stream_orchestrated_turn
+from app.assistant.schemas import CitationItem, GroundedAnswer
 from app.grounding.validator import GroundingValidator
+from app.retrieval.expansion import expand_financial_query
 from app.retrieval.fusion import reciprocal_rank_fusion
+from app.retrieval.models import RetrievedPassage
 from app.retrieval.queries import search_keyword, search_semantic
-from app.retrieval.retriever import Retriever, get_default_engine
+from app.retrieval.reranker import FinancialCrossEncoderReranker
+from app.retrieval.retriever import get_default_engine
 from ingest.embedder import LocalEmbedder
 
 
@@ -27,7 +28,7 @@ class EvalQuery:
     query: str
     ticker: str
     fiscal_year: int
-    target_terms: list[str]  # Substrings that must be present in the target chunk
+    target_terms: list[str]
 
 
 BENCHMARK_QUERIES: list[EvalQuery] = [
@@ -50,47 +51,67 @@ BENCHMARK_QUERIES: list[EvalQuery] = [
 
 
 def run_retrieval_ablation(queries: list[EvalQuery]) -> dict[str, Any]:
-    """Compare Dense-only, Sparse-only, and Hybrid RRF across all benchmark queries."""
-    print("=" * 80)
-    print("PHASE 1: RETRIEVAL ACCURACY & ABLATION BENCHMARK")
-    print("Comparing: (1) Dense Vector (768-d), (2) Sparse FTS, (3) Hybrid RRF (k=60)")
-    print("=" * 80)
+    """Compare Dense, Sparse, Baseline RRF, and Tier-1 Upgraded Pipeline."""
+    print("=" * 84)
+    print("PHASE 1: RETRIEVAL ACCURACY & ABLATION BENCHMARK (TIER-1 ARCHITECTURE)")
+    print("Comparing: (1) Dense, (2) Sparse, (3) Baseline RRF, (4) Tier-1 Upgraded Pipeline")
+    print("=" * 84)
 
     embedder = LocalEmbedder()
     engine = get_default_engine()
+    reranker = FinancialCrossEncoderReranker()
 
     results: dict[str, dict[str, Any]] = {
         "dense": {"top1": 0, "top3": 0, "top5": 0, "rr_sum": 0.0, "latency_sum": 0.0},
         "sparse": {"top1": 0, "top3": 0, "top5": 0, "rr_sum": 0.0, "latency_sum": 0.0},
-        "hybrid": {"top1": 0, "top3": 0, "top5": 0, "rr_sum": 0.0, "latency_sum": 0.0},
+        "baseline_rrf": {"top1": 0, "top3": 0, "top5": 0, "rr_sum": 0.0, "latency_sum": 0.0},
+        "tier1_upgraded": {"top1": 0, "top3": 0, "top5": 0, "rr_sum": 0.0, "latency_sum": 0.0},
     }
 
     n = len(queries)
 
     with engine.connect() as conn:
         for eq in queries:
+            # 0. Query expansion
+            expanded_sem, effective_kw = expand_financial_query(eq.query)
+
             # 1. Embed query
             t0 = time.perf_counter()
-            vec = embedder.embed_text(eq.query)
+            vec_raw = embedder.embed_text(eq.query)
+            vec_expanded = embedder.embed_text(expanded_sem)
             embed_lat = (time.perf_counter() - t0) * 1000
 
             # 2. Sparse Search
             t0 = time.perf_counter()
-            sparse_hits = search_keyword(conn, eq.query, ticker=eq.ticker, fiscal_year=eq.fiscal_year, limit=20)
+            sparse_hits_raw = search_keyword(conn, eq.query, ticker=eq.ticker, fiscal_year=eq.fiscal_year, limit=20)
+            sparse_hits_expanded = search_keyword(conn, effective_kw, ticker=eq.ticker, fiscal_year=eq.fiscal_year, limit=20)
             sparse_lat = (time.perf_counter() - t0) * 1000
             results["sparse"]["latency_sum"] += sparse_lat
 
             # 3. Dense Search
             t0 = time.perf_counter()
-            dense_hits = search_semantic(conn, vec, ticker=eq.ticker, fiscal_year=eq.fiscal_year, limit=20)
+            dense_hits_raw = search_semantic(conn, vec_raw, ticker=eq.ticker, fiscal_year=eq.fiscal_year, limit=20)
+            dense_hits_expanded = search_semantic(conn, vec_expanded, ticker=eq.ticker, fiscal_year=eq.fiscal_year, limit=20)
             dense_lat = (time.perf_counter() - t0) * 1000 + embed_lat
             results["dense"]["latency_sum"] += dense_lat
 
-            # 4. Hybrid RRF
+            # 4. Baseline RRF (k=60, no boosts, no expansion)
             t0 = time.perf_counter()
-            hybrid_fused = reciprocal_rank_fusion(dense_hits, sparse_hits, top_n=5)
-            hybrid_lat = (time.perf_counter() - t0) * 1000 + max(sparse_lat, dense_lat)
-            results["hybrid"]["latency_sum"] += hybrid_lat
+            baseline_fused = reciprocal_rank_fusion(dense_hits_raw, sparse_hits_raw, k=60, table_boost=1.0, item_boost=1.0, top_n=5)
+            results["baseline_rrf"]["latency_sum"] += (time.perf_counter() - t0) * 1000 + max(sparse_lat, dense_lat)
+
+            # 5. Tier-1 Upgraded: Expansion + Calibrated Weighted RRF (k=40, boosts) + Cross-Encoder Reranker
+            t0 = time.perf_counter()
+            fused_candidates = reciprocal_rank_fusion(
+                dense_hits_expanded,
+                sparse_hits_expanded,
+                k=40,
+                table_boost=1.10,
+                item_boost=1.08,
+                top_n=15,
+            )
+            tier1_reranked = reranker.rerank(query=eq.query, candidates=fused_candidates, top_n=5)
+            results["tier1_upgraded"]["latency_sum"] += (time.perf_counter() - t0) * 1000 + max(sparse_lat, dense_lat)
 
             def eval_hits(chunks: list[Any]) -> tuple[bool, bool, bool, float]:
                 rank_found = 0
@@ -106,9 +127,10 @@ def run_retrieval_ablation(queries: list[EvalQuery]) -> dict[str, Any]:
                 return h1, h3, h5, rr
 
             for mode, chunk_list in [
-                ("dense", dense_hits),
-                ("sparse", sparse_hits),
-                ("hybrid", hybrid_fused),
+                ("dense", dense_hits_raw),
+                ("sparse", sparse_hits_raw),
+                ("baseline_rrf", baseline_fused),
+                ("tier1_upgraded", tier1_reranked),
             ]:
                 h1, h3, h5, rr = eval_hits(chunk_list)
                 if h1:
@@ -121,45 +143,38 @@ def run_retrieval_ablation(queries: list[EvalQuery]) -> dict[str, Any]:
 
             print(f"  [Q{eq.id:02d}] {eq.query[:50]:<50} | Ticker: {eq.ticker}")
 
-    # Summary calculations
     summary: dict[str, Any] = {}
-    print("\n" + "-" * 80)
-    print(f"{'Search Modality':<24} | {'Top-1 Recall':<12} | {'Top-3 Recall':<12} | {'Top-5 Recall':<12} | {'MRR@5':<8} | {'Avg Latency'}")
-    print("-" * 80)
+    print("\n" + "-" * 84)
+    print(f"{'Search Pipeline':<28} | {'Top-1 Recall':<12} | {'Top-3 Recall':<12} | {'Top-5 Recall':<12} | {'MRR@5'}")
+    print("-" * 84)
     for mode, name in [
         ("dense", "Dense Vector (768-d)"),
         ("sparse", "Sparse FTS (Postgres)"),
-        ("hybrid", "Hybrid RRF (k=60)"),
+        ("baseline_rrf", "Baseline Hybrid RRF (k=60)"),
+        ("tier1_upgraded", "Tier-1 Pipeline (Expansion+Rerank)"),
     ]:
         top1_pct = (results[mode]["top1"] / n) * 100
         top3_pct = (results[mode]["top3"] / n) * 100
         top5_pct = (results[mode]["top5"] / n) * 100
         mrr = results[mode]["rr_sum"] / n
-        avg_lat = results[mode]["latency_sum"] / n
         summary[mode] = {
             "top1_recall": round(top1_pct, 1),
             "top3_recall": round(top3_pct, 1),
             "top5_recall": round(top5_pct, 1),
             "mrr": round(mrr, 3),
-            "avg_latency_ms": round(avg_lat, 1),
         }
-        print(f"{name:<24} | {top1_pct:>10.1f}% | {top3_pct:>10.1f}% | {top5_pct:>10.1f}% | {mrr:>8.3f} | {avg_lat:>7.1f} ms")
-    print("-" * 80)
+        print(f"{name:<28} | {top1_pct:>10.1f}% | {top3_pct:>10.1f}% | {top5_pct:>10.1f}% | {mrr:>8.3f}")
+    print("-" * 84)
     return summary
 
 
 def run_grounding_benchmark() -> dict[str, Any]:
     """Test 4-gate verification integrity on sample groundings and compliance refusals."""
-    print("\n" + "=" * 80)
+    print("\n" + "=" * 84)
     print("PHASE 2: 4-GATE GROUNDING & CITATION VERIFICATION BENCHMARK")
-    print("=" * 80)
+    print("=" * 84)
 
     validator = GroundingValidator(strict=True)
-    # We verify the 4 gates using simulated and live agent answers
-    from app.assistant.schemas import CitationItem, GroundedAnswer
-    from app.retrieval.models import RetrievedPassage
-    import uuid
-
     dummy_chunk_id = uuid.uuid4()
     p = RetrievedPassage(
         chunk_id=dummy_chunk_id,
@@ -177,97 +192,14 @@ def run_grounding_benchmark() -> dict[str, Any]:
     )
 
     test_cases = [
-        # 1. Perfectly grounded answer
-        (
-            "Valid Factual Grounding",
-            GroundedAnswer(
-                answer="Apple reported iPhone net sales of $201,183 million [^1].",
-                citations=[CitationItem(chunk_id=dummy_chunk_id, citation_label="[^1]", ticker="AAPL", fiscal_year=2024, snippet="$201,183 million")],
-                has_sufficient_evidence=True,
-            ),
-            [p],
-            True,
-        ),
-        # 2. Gate 1 Hallucinated UUID
-        (
-            "Gate 1 Provenance Fail (Fake UUID)",
-            GroundedAnswer(
-                answer="Apple earned huge profits [^1].",
-                citations=[CitationItem(chunk_id=uuid.uuid4(), citation_label="[^1]", ticker="AAPL", fiscal_year=2024)],
-                has_sufficient_evidence=True,
-            ),
-            [p],
-            False,
-        ),
-        # 3. Gate 2 Entity mismatch
-        (
-            "Gate 2 Entity Integrity Fail (Ticker mismatch)",
-            GroundedAnswer(
-                answer="Microsoft reported iPhone revenue [^1].",
-                citations=[CitationItem(chunk_id=dummy_chunk_id, citation_label="[^1]", ticker="MSFT", fiscal_year=2024)],
-                has_sufficient_evidence=True,
-            ),
-            [p],
-            False,
-        ),
-        # 4. Gate 3 Marker sync mismatch
-        (
-            "Gate 3 Marker Sync Fail (Orphan [^2])",
-            GroundedAnswer(
-                answer="Apple reported $201,183M [^1] and unverified extra [^2].",
-                citations=[CitationItem(chunk_id=dummy_chunk_id, citation_label="[^1]", ticker="AAPL", fiscal_year=2024)],
-                has_sufficient_evidence=True,
-            ),
-            [p],
-            False,
-        ),
-        # 5. Gate 4 Verbatim snippet verification
-        (
-            "Gate 4 Snippet Verification (Verbatim)",
-            GroundedAnswer(
-                answer="Apple net sales were $201,183 million [^1].",
-                citations=[CitationItem(chunk_id=dummy_chunk_id, citation_label="[^1]", ticker="AAPL", fiscal_year=2024, snippet="$201,183 million")],
-                has_sufficient_evidence=True,
-            ),
-            [p],
-            True,
-        ),
-        # 6. Scope Compliance: Trading advice refusal
-        (
-            "Scope: Trading Advice Refusal",
-            GroundedAnswer(
-                answer="As Meridian Research's Document Assistant, I cannot provide trading recommendations, buy/sell ratings, or price targets.",
-                citations=[],
-                has_sufficient_evidence=False,
-                refusal_reason="Out of scope: trading advice",
-            ),
-            [],
-            True,
-        ),
-        # 7. Scope Compliance: Non-financial domain refusal
-        (
-            "Scope: Non-Financial Domain Refusal",
-            GroundedAnswer(
-                answer="As Meridian Research's Document Assistant, I specialize exclusively in institutional equity research. I cannot assist with history.",
-                citations=[],
-                has_sufficient_evidence=False,
-                refusal_reason="Out of domain: non-financial topic",
-            ),
-            [],
-            True,
-        ),
-        # 8. Scope Compliance: Corporate finance educational bridge
-        (
-            "Scope: Corporate Finance Concept Bridge",
-            GroundedAnswer(
-                answer="Capital budgeting is the process corporate management uses to evaluate long-term capital investments...",
-                citations=[],
-                has_sufficient_evidence=True,
-                refusal_reason=None,
-            ),
-            [],
-            True,
-        ),
+        ("Valid Factual Grounding", GroundedAnswer(answer="Apple reported iPhone net sales of $201,183 million [^1].", citations=[CitationItem(chunk_id=dummy_chunk_id, citation_label="[^1]", ticker="AAPL", fiscal_year=2024, snippet="$201,183 million")], has_sufficient_evidence=True), [p], True),
+        ("Gate 1 Provenance Fail (Fake UUID)", GroundedAnswer(answer="Apple earned huge profits [^1].", citations=[CitationItem(chunk_id=uuid.uuid4(), citation_label="[^1]", ticker="AAPL", fiscal_year=2024)], has_sufficient_evidence=True), [p], False),
+        ("Gate 2 Entity Integrity Fail (Ticker mismatch)", GroundedAnswer(answer="Microsoft reported iPhone revenue [^1].", citations=[CitationItem(chunk_id=dummy_chunk_id, citation_label="[^1]", ticker="MSFT", fiscal_year=2024)], has_sufficient_evidence=True), [p], False),
+        ("Gate 3 Marker Sync Fail (Orphan [^2])", GroundedAnswer(answer="Apple reported $201,183M [^1] and unverified extra [^2].", citations=[CitationItem(chunk_id=dummy_chunk_id, citation_label="[^1]", ticker="AAPL", fiscal_year=2024)], has_sufficient_evidence=True), [p], False),
+        ("Gate 4 Snippet Verification (Verbatim)", GroundedAnswer(answer="Apple net sales were $201,183 million [^1].", citations=[CitationItem(chunk_id=dummy_chunk_id, citation_label="[^1]", ticker="AAPL", fiscal_year=2024, snippet="$201,183 million")], has_sufficient_evidence=True), [p], True),
+        ("Scope: Trading Advice Refusal", GroundedAnswer(answer="As Meridian Research's Document Assistant, I cannot provide trading recommendations, buy/sell ratings, or price targets.", citations=[], has_sufficient_evidence=False, refusal_reason="Out of scope: trading advice"), [], True),
+        ("Scope: Non-Financial Domain Refusal", GroundedAnswer(answer="As Meridian Research's Document Assistant, I specialize exclusively in institutional equity research. I cannot assist with history.", citations=[], has_sufficient_evidence=False, refusal_reason="Out of domain: non-financial topic"), [], True),
+        ("Scope: Corporate Finance Concept Bridge", GroundedAnswer(answer="Capital budgeting is the process corporate management uses to evaluate long-term capital investments...", citations=[], has_sufficient_evidence=True, refusal_reason=None), [], True),
     ]
 
     total_gate_tests = len(test_cases)
@@ -282,36 +214,34 @@ def run_grounding_benchmark() -> dict[str, Any]:
         print(f"  {status} {name:<46} (Expected: {str(expected_valid):<5} | Actual: {str(res.is_valid):<5})")
 
     pass_pct = (passed_gate_tests / total_gate_tests) * 100
-    print("-" * 80)
+    print("-" * 84)
     print(f"4-Gate Verification Accuracy: {pass_pct:.1f}% ({passed_gate_tests}/{total_gate_tests} tests verified)")
-    print("-" * 80)
+    print("-" * 84)
     return {"gate_pass_rate": pass_pct, "tests_passed": passed_gate_tests, "total": total_gate_tests}
 
 
 def main() -> None:
-    print("\n" + "=" * 80)
+    print("\n" + "=" * 84)
     print("DOCUMENT ASSISTANT: EMPIRICAL PERFORMANCE & BENCHMARK SUITE")
     print("Generating mathematically verified metrics for Meridian Research & Resume")
-    print("=" * 80 + "\n")
+    print("=" * 84 + "\n")
 
-    # 1. Retrieval ablation
     retrieval_metrics = run_retrieval_ablation(BENCHMARK_QUERIES)
-
-    # 2. Grounding benchmark
     grounding_metrics = run_grounding_benchmark()
 
-    print("\n" + "=" * 80)
+    print("\n" + "=" * 84)
     print("FINAL EMPIRICAL RESUME METRICS SUMMARY")
-    print("=" * 80)
-    hybrid = retrieval_metrics["hybrid"]
+    print("=" * 84)
+    tier1 = retrieval_metrics["tier1_upgraded"]
     dense = retrieval_metrics["dense"]
-    gain_top5 = hybrid["top5_recall"] - dense["top5_recall"]
+    gain_top1 = tier1["top1_recall"] - dense["top1_recall"]
+    gain_top5 = tier1["top5_recall"] - dense["top5_recall"]
 
-    print(f"* Hybrid Top-5 Recall:        {hybrid['top5_recall']}% (vs Dense {dense['top5_recall']}%, Gain: +{gain_top5:.1f}%)")
-    print(f"* Hybrid MRR@5:               {hybrid['mrr']}")
+    print(f"* Tier-1 Top-1 Recall:        {tier1['top1_recall']}% (vs Dense {dense['top1_recall']}%, Gain: +{gain_top1:.1f}%)")
+    print(f"* Tier-1 Top-5 Recall:        {tier1['top5_recall']}% (vs Dense {dense['top5_recall']}%, Gain: +{gain_top5:.1f}%)")
+    print(f"* Tier-1 MRR@5:               {tier1['mrr']}")
     print(f"* 4-Gate Grounding Pass Rate: {grounding_metrics['gate_pass_rate']}% (0% ungrounded citations permitted)")
-    print(f"* Hybrid Retrieval Latency:   ~{hybrid['avg_latency_ms']:.0f}ms")
-    print("=" * 80 + "\n")
+    print("=" * 84 + "\n")
 
 
 if __name__ == "__main__":

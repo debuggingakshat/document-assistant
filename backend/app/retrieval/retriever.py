@@ -1,14 +1,18 @@
-"""High-level Retriever service combining embedding, hybrid search, RRF, and neighbor expansion."""
+"""High-level Retriever service combining embedding, hybrid search, RRF, cross-encoder reranking, and neighbor expansion."""
 
 import concurrent.futures
 import logging
+import uuid
+from typing import Sequence
 
 from sqlalchemy import Engine, create_engine
 
 from app.config import settings
+from app.retrieval.expansion import expand_financial_query
 from app.retrieval.fusion import reciprocal_rank_fusion
 from app.retrieval.models import FusedChunk, RetrievedChunk, RetrievedPassage
 from app.retrieval.queries import fetch_neighbor_chunks, search_keyword, search_semantic
+from app.retrieval.reranker import FinancialCrossEncoderReranker
 from ingest.embedder import LocalEmbedder
 
 logger = logging.getLogger(__name__)
@@ -30,17 +34,19 @@ def get_default_engine() -> Engine:
 
 
 class Retriever:
-    """Hybrid search retriever over SEC 10-K document chunks with concurrent branch execution."""
+    """Hybrid search retriever over SEC 10-K document chunks with two-stage cross-encoder re-ranking."""
 
     def __init__(
         self,
         embedder: LocalEmbedder | None = None,
         engine: Engine | None = None,
         max_workers: int = 2,
+        reranker: FinancialCrossEncoderReranker | None = None,
     ) -> None:
         self.embedder = embedder or LocalEmbedder()
         self.engine = engine or get_default_engine()
         self.max_workers = max_workers
+        self.reranker = reranker or FinancialCrossEncoderReranker()
 
     def retrieve(
         self,
@@ -51,10 +57,10 @@ class Retriever:
         candidate_limit: int = 20,
         expand_neighbors: bool = True,
     ) -> list[RetrievedPassage]:
-        """Perform end-to-end hybrid retrieval with concurrent branches, RRF, and neighbor expansion.
+        """Perform end-to-end hybrid retrieval with query expansion, RRF, cross-encoder reranking, and context expansion.
 
-        Runs full-text keyword search and semantic embedding + vector search concurrently
-        to minimize total latency.
+        Runs full-text keyword search and semantic embedding + vector search concurrently,
+        fuses candidates with domain-weighted RRF, and applies a cross-encoder re-ranker.
 
         Args:
             query: User's natural language question or search phrase.
@@ -71,19 +77,22 @@ class Retriever:
         if not clean_query:
             return []
 
+        # 0. Query Expansion: Enrich with official SEC GAAP line-item synonyms
+        expanded_semantic_q, effective_kw_query = expand_financial_query(clean_query)
+
         def _run_keyword_branch() -> list[RetrievedChunk]:
             with self.engine.connect() as conn:
                 return search_keyword(
                     conn=conn,
-                    query_text=clean_query,
+                    query_text=effective_kw_query,
                     ticker=ticker,
                     fiscal_year=fiscal_year,
                     limit=candidate_limit,
                 )
 
         def _run_semantic_branch() -> list[RetrievedChunk]:
-            # Local query embedding (MPS/CPU) runs concurrently with keyword I/O
-            query_vec = self.embedder.embed_text(clean_query)
+            # Embedding call runs concurrently with keyword I/O
+            query_vec = self.embedder.embed_text(expanded_semantic_q)
             with self.engine.connect() as conn:
                 return search_semantic(
                     conn=conn,
@@ -102,20 +111,48 @@ class Retriever:
             keyword_candidates = fut_keyword.result()
             semantic_candidates = fut_semantic.result()
 
-        # 2. Fuse branches with Reciprocal Rank Fusion
+        # 2. Stage 1: Domain-Boosted Reciprocal Rank Fusion (candidate pool: top 15)
         fused_candidates: list[FusedChunk] = reciprocal_rank_fusion(
             semantic_results=semantic_candidates,
             keyword_results=keyword_candidates,
-            top_n=top_n,
+            k=40,
+            table_boost=1.10,
+            item_boost=1.08,
+            top_n=max(top_n * 3, 15),
         )
 
         if not fused_candidates:
             return []
 
-        # 3. Optional neighbor chunk context expansion
+        # 3. Stage 2: Cross-Encoder Re-Ranking (Cross-Attention Features)
+        reranked_candidates = self.reranker.rerank(
+            query=clean_query,
+            candidates=fused_candidates,
+            top_n=top_n,
+        )
+
+        # 4. Optional neighbor chunk context expansion with batched queries
         passages: list[RetrievedPassage] = []
         with self.engine.connect() as conn:
-            for item in fused_candidates:
+            # Collect all neighbor requests grouped by document_id
+            neighbor_cache: dict[tuple[uuid.UUID, int], str] = {}
+            if expand_neighbors:
+                doc_to_indices: dict[uuid.UUID, set[int]] = {}
+                for item in reranked_candidates:
+                    c = item.chunk
+                    if c.chunk_index > 0:
+                        doc_to_indices.setdefault(c.document_id, set()).update(
+                            [c.chunk_index - 1, c.chunk_index + 1]
+                        )
+
+                for doc_id, indices in doc_to_indices.items():
+                    res = fetch_neighbor_chunks(
+                        conn=conn, document_id=doc_id, chunk_indices=list(indices)
+                    )
+                    for c_idx, c_txt in res.items():
+                        neighbor_cache[(doc_id, c_idx)] = c_txt
+
+            for item in reranked_candidates:
                 chunk = item.chunk
                 meta = chunk.metadata or {}
                 headings = meta.get("headings", [])
@@ -132,14 +169,8 @@ class Retriever:
 
                 full_text = chunk.chunk_text
                 if expand_neighbors and chunk.chunk_index > 0:
-                    neighbor_indices = [chunk.chunk_index - 1, chunk.chunk_index + 1]
-                    neighbors = fetch_neighbor_chunks(
-                        conn=conn,
-                        document_id=chunk.document_id,
-                        chunk_indices=neighbor_indices,
-                    )
-                    prev_text = neighbors.get(chunk.chunk_index - 1, "")
-                    next_text = neighbors.get(chunk.chunk_index + 1, "")
+                    prev_text = neighbor_cache.get((chunk.document_id, chunk.chunk_index - 1), "")
+                    next_text = neighbor_cache.get((chunk.document_id, chunk.chunk_index + 1), "")
 
                     parts: list[str] = []
                     if prev_text:
@@ -175,7 +206,7 @@ class Retriever:
                 )
 
         logger.info(
-            "Retrieved %d passages for query='%s' (ticker=%s, fy=%s)",
+            "Retrieved & reranked %d passages for query='%s' (ticker=%s, fy=%s)",
             len(passages),
             clean_query,
             ticker,
