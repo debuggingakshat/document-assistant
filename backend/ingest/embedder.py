@@ -129,15 +129,16 @@ class GoogleEmbedder:
                 last_error = err
                 err_str = str(err)
 
-                # Check if it is a daily quota exhaustion
+                # Check if it is a daily quota exhaustion or invalid/disabled key
                 is_daily_limit = "EmbedContentRequestsPerDay" in err_str or "Retry in 7h" in err_str or "retry in 7h" in err_str or "retryDelay" in err_str
+                is_invalid_key = "401" in err_str or "UNAUTHENTICATED" in err_str or "ACCOUNT_STATE_INVALID" in err_str or "API key not valid" in err_str
 
-                if is_daily_limit:
+                if is_daily_limit or is_invalid_key:
                     if self._mark_key_exhausted_and_rotate():
-                        time.sleep(1.0)
+                        time.sleep(0.5)
                         continue
                     else:
-                        raise RuntimeError(f"All API keys exhausted daily limit: {err_str}")
+                        raise RuntimeError(f"All API keys exhausted or invalid: {err_str}")
 
                 # If it is a TPM / RPM rate limit (temporary), wait for sliding window to drain
                 wait_seconds = 10 + (attempt * 5)
