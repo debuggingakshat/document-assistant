@@ -567,6 +567,22 @@ async def stream_orchestrated_turn(
         yield format_ai_sdk_finish_part()
         return
 
+    # If auto-failover switched models, immediately inform the progress stepper
+    if isinstance(actual_model_used, str) and actual_model_used != target_primary_name:
+        failover_label = MODEL_DISPLAY_NAMES.get(actual_model_used, actual_model_used)
+        primary_label = MODEL_DISPLAY_NAMES.get(target_primary_name, target_primary_name)
+        yield format_ai_sdk_status_part(
+            stage="reasoning",
+            title=f"Auto-Routed: {primary_label} → {failover_label}",
+            message=f"{primary_label} capacity reached across API keys. Seamlessly switched to {failover_label}...",
+            technical_details={
+                "orchestrator": "PydanticAI Multi-Key Waterfall",
+                "requested_model": primary_label,
+                "active_model": failover_label,
+                "status": "auto_failover_success",
+            },
+        )
+
     # Step 4: Grounding Validation
     yield format_ai_sdk_status_part(
         stage="validating",
@@ -598,20 +614,6 @@ async def stream_orchestrated_turn(
         final_answer_text += warning_msg
 
     # 5. Persist assistant message with model & parent linkage
-        # If auto-failover switched models, emit a smooth status update
-    if isinstance(actual_model_used, str) and actual_model_used != target_primary_name:
-        failover_label = MODEL_DISPLAY_NAMES.get(actual_model_used, actual_model_used)
-        yield format_ai_sdk_status_part(
-            stage="reasoning",
-            title=f"Auto-Routed to {failover_label}",
-            message=f"Primary model capacity reached. Smoothly synthesized answer via {failover_label}...",
-            technical_details={
-                "orchestrator": "PydanticAI Multi-Key Waterfall",
-                "llm": actual_model_used,
-                "status": "auto_failover_success",
-            },
-        )
-
     asst_metadata: dict[str, Any] = {"model": actual_model_used}
     if parent_user_message_id:
         asst_metadata["parent_user_message_id"] = str(parent_user_message_id)
