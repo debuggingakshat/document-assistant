@@ -71,13 +71,13 @@ The application is architected as a modern, decoupled full-stack system designed
 │                                                                                  │
 │  Google AI Studio API:                                                           │
 │  ├── gemini-embedding-001: 768-dimensional text embeddings                       │
-│  └── gemini-3-flash-preview: Primary reasoning core (2.5 & 2.0 fallback cascade) │
+│  └── Gemini Multi-Model Pool: 7-model 2D waterfall failover (2,160+ RPD headroom)│
 └──────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Complete Request-Response Lifecycle
 When an equity analyst submits an inquiry to the Document Assistant, the system executes the following 10-step lifecycle:
-1. **Analyst Keystroke & Submission**: The analyst submits a query (e.g., *"What was Apple's Services revenue and margin in fiscal 2024?"*) in the React 19 interface.
+1. **Analyst Keystroke & Model Selection**: The analyst selects their preferred model from the 5 curated tiers (Gemini 3 Flash, Gemini 2.5 Flash, Gemini 2.0 Flash, Gemini 2.0 Flash Lite, or Gemini 3.1 Flash Lite) and submits their financial query.
 2. **SSE Connection Initialization**: The client opens an HTTP `POST /api/chat` connection using Server-Sent Events (SSE) compliant with the Vercel AI SDK Data Stream Protocol.
 3. **Session State & Ticker Resolution**:
    - `ChatOrchestrator` fetches the last 6 messages (`LIMIT 6`) from Supabase to maintain conversational context.
@@ -89,8 +89,9 @@ When an equity analyst submits an inquiry to the Document Assistant, the system 
    - The engine merges candidates from both branches using unsupervised Reciprocal Rank Fusion with smoothing parameter $k=60$.
    - For the top-ranking chunks, the engine runs a single batched SQL query to retrieve `prev_chunk_id` and `next_chunk_id`, reconstructing surrounding narrative paragraphs and table headers.
 6. **Prompt Assembly & Tool Binding**: The orchestrator injects the fused, verified context passages, the prior conversational history, and strict grounding instructions into the system prompt of the PydanticAI agent.
-7. **Agent Reasoning & Tool Calling**:
-   - The primary model (`gemini-3-flash-preview`) reasons over the injected 10-K context.
+7. **Agent Reasoning & Waterfall Execution**:
+   - The engine initiates reasoning with the selected model on Key 1.
+   - If quota exhaustion (HTTP 429) occurs, the 2D waterfall engine automatically retries the same model on Key 2 before cascading across the 7-model fallback sequence, streaming real-time auto-route announcements before Grounding Verification.
    - If comparative analysis requires disclosures outside the initial retrieval window, the model dynamically calls its runtime tools (`search_filings` or `read_chunk`).
 8. **Structured Output Construction**: The model generates a structured `GroundedAnswer` object containing the narrative markdown response and a list of `CitationItem` objects.
 9. **4-Gate Fail-Closed Grounding Verification**:
@@ -509,7 +510,7 @@ The entire full-stack application is deployed and operated across production clo
 | **Frontend CDN** | **Vercel Hobby Edge Network** | Global CDN caching, edge routing, auto-deploys from GitHub `main`. | **$0.00** |
 | **Backend API** | **Render Free Web Service** | Python 3.13 + Uvicorn via `uv`, container memory <80MB, sub-2s health responses. | **$0.00** |
 | **Database & Vectors** | **Supabase Free Tier** | PostgreSQL 15, `pgvector` HNSW indexes, full-text search, Row Level Security. | **$0.00** |
-| **Reasoning & Embeddings** | **Google AI Studio Free Tier** | 2 healthy API keys across 5 models (`gemini-3-flash-preview`, `gemini-3.8-flash`, `gemini-3.1-flash-lite-preview`, `gemini-3.5-flash-lite`, `gemini-flash-lite-latest`) delivering **2,160+ requests/day** with zero-cost failover. | **$0.00** |
+| **Reasoning & Embeddings** | **Google AI Studio Free Tier** | 2 healthy API keys across 7 models (`gemini-3-flash-preview`, `gemini-3.8-flash`, `gemini-3.7-flash`, `gemini-3.6-flash`, `gemini-3.5-flash-lite`, `gemini-3.1-flash-lite-preview`, `gemini-flash-lite-latest`) delivering **2,160+ requests/day** with zero-cost failover. | **$0.00** |
 | **Test Suite** | **GitHub Actions / Local Pytest** | **64 / 64 unit and integration tests passing** (`pytest backend/tests`). | **$0.00** |
 
 ---
@@ -547,17 +548,19 @@ All **64 / 64 unit and integration tests** will execute and pass, verifying:
 
 To ensure zero downtime during peak Google AI Studio traffic and maximize free tier operational capacity without credit card billing, the system implements a **2-Dimensional Multi-Key and Multi-Model Waterfall Engine**:
 
-### 1. Daily Quota Economics (1,160+ Free Requests/Day at $0.00)
-Google AI Studio allocates rate limits per model per active Google Cloud project. By pooling 2 verified healthy Google Cloud projects (`Document Assistant` & `Document Assistant 3`) across 5 verified live models, our free-tier headroom scales to over 1,160 requests per day:
+### 1. Daily Quota Economics (2,160+ Free Requests/Day at $0.00)
+Google AI Studio allocates rate limits per model per active Google Cloud project. By pooling 2 verified healthy Google Cloud projects (`Document Assistant` & `Document Assistant 3`) across 7 verified live models, our free-tier headroom scales to over 2,160 requests per day:
 
 | Model ID | UI Display Label | Quota Per Project | Combined Daily Headroom (2 Keys) | Role in Architecture |
 | :--- | :--- | :---: | :---: | :--- |
 | `gemini-3-flash-preview` | **Gemini 3 Flash** | 20 RPD | 40 RPD | Primary reasoning engine for complex synthetic disclosures. |
-| `gemini-3.8-flash` (mapped from `gemini-2.5-flash`) | **Gemini 2.5 Flash** | 20 RPD | 40 RPD | Optimal balance of speed and multi-step financial math. |
-| `gemini-3.8-flash` (mapped from `gemini-2.0-flash`) | **Gemini 2.0 Flash** | 20 RPD | 40 RPD | Ultra-fast standard response generation. |
-| `gemini-flash-lite-latest` | **Gemini 2.0 Flash Lite** | 20 RPD | 40 RPD | Sub-second lightweight quick answers. |
-| `gemini-3.1-flash-lite-preview` | **Gemini 3.1 Flash Lite** | **500 RPD** | **1,000 RPD** | **High-capacity workhorse tier** ensuring queries never fail. |
-| **Total Daily Capacity** | **Full Coverage Universe** | **580 RPD / Key** | **2,160+ Requests / Day** | **Permanent $0.00 / ₹0 Cloud Footprint** |
+| `gemini-3.8-flash` | **Gemini 3.8 / 2.5 Flash** | 20 RPD | 40 RPD | Balanced multi-step financial math and disclosures. |
+| `gemini-3.7-flash` | **Gemini 3.7 Flash** | 20 RPD | 40 RPD | Fast standard flash fallback tier. |
+| `gemini-3.6-flash` | **Gemini 3.6 Flash** | 20 RPD | 40 RPD | Resilient intermediate flash fallback tier. |
+| `gemini-3.5-flash-lite` | **Gemini 3.5 Flash Lite** | **500 RPD** | **1,000 RPD** | **Massive 1,000 RPD workhorse tier** for high throughput. |
+| `gemini-3.1-flash-lite-preview` | **Gemini 3.1 Flash Lite** | **500 RPD** | **1,000 RPD** | **Secondary 1,000 RPD workhorse tier** ensuring 0% dropped queries. |
+| `gemini-flash-lite-latest` | **Gemini Flash Lite** | 20 RPD | 40 RPD | Sub-second ultralight low-latency backup. |
+| **Total Daily Capacity** | **Full Coverage Universe** | **1,080 RPD / Key** | **2,160+ Requests / Day** | **Permanent $0.00 / ₹0 Cloud Footprint** |
 
 ---
 
@@ -590,7 +593,7 @@ User Query Submitted (e.g. Model = Gemini 3 Flash)
 
 #### Key Engineering Invariants of the Waterfall Engine:
 1. **Model Fidelity Invariant**: The system never switches models if the quota error can be resolved simply by rotating the API key. It exhausts Key 1 and Key 2 on the user's selected model first.
-2. **Zero-Error Invariant**: The user is never interrupted with a high-demand warning or retry modal until all 10 combinations (5 models × 2 keys = 2,160+ requests) are exhausted.
+2. **Zero-Error Invariant**: The user is never interrupted with a high-demand warning or retry modal until all 10 combinations (7 models × 2 keys = 2,160+ requests) are exhausted.
 3. **Real-Time Progress Synchronization**: If a cross-model switch occurs, the backend immediately streams a high-priority SSE event (`stage="reasoning"`, `title="Auto-Routed: Gemini 3 Flash → Gemini 3.1 Flash Lite"`) *before* Grounding Verification. The UI progress stepper updates live, informing the analyst of the model transition while the response is being finalized.
 4. **Authentic Provenance Invariant**: The assistant message metadata stores the exact model that synthesized the answer (`asst_metadata = {"model": actual_model_used}`), so the UI message header badge accurately reflects the generating engine.
 
