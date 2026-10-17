@@ -532,3 +532,33 @@ All **64 / 64 unit and integration tests** will execute and pass, verifying:
 - `test_grounding.py`: 4-gate fail-closed grounding validation.
 - `test_scope.py`: Finance-exclusive domain compliance and refusal guardrails.
 - `test_orchestrator.py`: Ticker state machine and multi-turn inheritance.
+
+---
+
+## 13. High-Availability Multi-Model & Multi-Key Cascade (1,160+ RPD Architecture)
+
+To ensure zero downtime during peak Google AI Studio traffic and maximize free tier operational capacity without credit card billing, the system implements a **2-Dimensional Multi-Key and Multi-Model Waterfall Engine**:
+
+### 1. Daily Quota Economics (1,160+ Free Requests/Day at $0.00)
+Google AI Studio allocates rate limits per model per active project. By pooling 2 verified healthy Google Cloud projects across 5 verified live models, our free-tier headroom scales dramatically:
+
+| Model ID | UI Display Label | Quota Per Project | Combined Daily Headroom (2 Keys) |
+| :--- | :--- | :---: | :---: |
+| `gemini-3-flash-preview` | **Gemini 3 Flash** | 20 RPD | 40 RPD |
+| `gemini-3.8-flash` (mapped from `gemini-2.5-flash`) | **Gemini 2.5 Flash** | 20 RPD | 40 RPD |
+| `gemini-3.8-flash` (mapped from `gemini-2.0-flash`) | **Gemini 2.0 Flash** | 20 RPD | 40 RPD |
+| `gemini-flash-lite-latest` | **Gemini 2.0 Flash Lite** | 20 RPD | 40 RPD |
+| `gemini-3.1-flash-lite-preview` | **Gemini 3.1 Flash Lite** | **500 RPD** | **1,000 RPD** |
+| **Total Daily Capacity** | **Full Coverage Universe** | **580 RPD / Key** | **1,160+ Requests / Day** |
+
+### 2. 2D Waterfall Failover Algorithm
+In `backend/app/chat/orchestrator.py`, `_run_agent_with_failover()` executes a silent multi-tier loop:
+1. **Tier 1 (User Choice on Key 1)**: Submits prompt to user's selected model via primary API key.
+2. **Tier 2 (Same Model on Key 2)**: On HTTP 429/503 quota exhaustion, instantaneously switches to Key 2.
+3. **Tier 3 (Waterfall Cascade)**: If both keys exhaust quota for that model, silently cascades through remaining models (`Gemini 3 Flash` -> `Gemini 3.8 Flash` -> `Gemini 3.1 Flash Lite` -> `Gemini 3.5 Flash Lite` -> `Gemini Flash Lite`) across both keys.
+4. **Zero-Error User Experience**: The user never experiences an error or demand warning until all 1,160+ requests across all 10 combinations fail.
+
+### 3. Dynamic Progress Stepper & Callout Styler
+- **Frontend Dropdown** (`MessageInput.tsx`): Exposes all 5 models with speed and quota badges.
+- **Progress Stepper** (`PipelineStatusIndicator.tsx`): Binds step telemetry to the active model (`PydanticAI Reasoning with [Selected Model]`), dynamically notifying if an auto-route occurs.
+- **Glassmorphic Callout Styler** (`MessageItem.tsx`): Formats markdown `> [!WARNING]` and system notices into amber-bordered callout cards with warning icons matching the Meridian dark palette.

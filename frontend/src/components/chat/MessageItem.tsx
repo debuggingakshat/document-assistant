@@ -56,10 +56,13 @@ export function MessageItem({
 
   const modelBadge = useMemo(() => {
     const raw = message.ai_sdk_metadata?.model
-    if (raw === "gemini-2.5-pro") return "Gemini 2.5 Pro"
-    if (raw === "gemini-2.0-flash-lite") return "Gemini 2.0 Flash Lite"
+    if (raw === "gemini-3-flash" || raw === "gemini-3-flash-preview") return "Gemini 3 Flash"
     if (raw === "gemini-2.5-flash") return "Gemini 2.5 Flash"
-    return "Gemini 2.5 Flash"
+    if (raw === "gemini-2.0-flash" || raw === "gemini-3.8-flash") return "Gemini 2.0 Flash"
+    if (raw === "gemini-2.0-flash-lite" || raw === "gemini-flash-lite-latest") return "Gemini 2.0 Flash Lite"
+    if (raw === "gemini-3.1-flash-lite" || raw === "gemini-3.1-flash-lite-preview") return "Gemini 3.1 Flash Lite"
+    if (raw === "gemini-3.5-flash-lite") return "Gemini 3.5 Flash Lite"
+    return raw || "Gemini 2.5 Flash"
   }, [message.ai_sdk_metadata])
 
   const timeDisplay = formatMessageTime(message.created_at)
@@ -253,11 +256,12 @@ export function MessageItem({
     })
   }
 
-  // Render text blocks containing paragraphs, headings, and lists
+  // Render text blocks containing paragraphs, headings, lists, and formatted callouts
   function renderTextBlock(textBlock: string, blockKey: string | number) {
     const lines = textBlock.split("\n")
     const elements: React.ReactNode[] = []
     let listBuffer: string[] = []
+    let calloutBuffer: string[] = []
 
     function flushList() {
       if (listBuffer.length > 0) {
@@ -278,13 +282,89 @@ export function MessageItem({
       }
     }
 
+    function flushCallout() {
+      if (calloutBuffer.length > 0) {
+        const fullBlockText = calloutBuffer.join(" ")
+        const isWarning =
+          fullBlockText.includes("[!WARNING]") ||
+          fullBlockText.includes("High Demand Notice") ||
+          fullBlockText.includes("Alert") ||
+          fullBlockText.includes("Warning")
+
+        // Clean out ">", "[!WARNING]", "[!NOTE]"
+        const cleanLines = calloutBuffer
+          .map((line) =>
+            line
+              .replace(/^>\s?/, "")
+              .replace(/\[!(WARNING|NOTE|TIP|IMPORTANT|CAUTION)\]/g, "")
+              .trim()
+          )
+          .filter((line) => line.length > 0)
+
+        let titleLine = "System Notice"
+        let bodyLines = cleanLines
+
+        if (cleanLines.length > 0) {
+          const first = cleanLines[0]
+          if (first.startsWith("**") && first.endsWith("**")) {
+            titleLine = first.slice(2, -2).trim()
+            bodyLines = cleanLines.slice(1)
+          } else if (first.includes("Notice") || first.includes("Alert") || first.includes("Warning")) {
+            titleLine = first.replace(/\*\*/g, "").trim()
+            bodyLines = cleanLines.slice(1)
+          } else if (isWarning) {
+            titleLine = "Notice"
+          }
+        }
+
+        elements.push(
+          <div
+            key={`callout-${elements.length}`}
+            className={cn(
+              "my-3 flex items-start gap-3 rounded-2xl border p-3.5 text-xs shadow-xs transition-all backdrop-blur-sm",
+              isWarning
+                ? "border-amber-500/35 bg-amber-500/10 text-amber-900 dark:border-amber-500/30 dark:bg-amber-950/30 dark:text-amber-200"
+                : "border-primary/30 bg-primary/10 text-foreground"
+            )}
+          >
+            {isWarning ? (
+              <AlertTriangle className="size-4.5 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+            ) : (
+              <ShieldCheck className="size-4.5 shrink-0 text-primary mt-0.5" />
+            )}
+            <div className="space-y-1 flex-1">
+              <p className="font-bold text-foreground text-[12.5px] tracking-tight">
+                {titleLine}
+              </p>
+              {bodyLines.map((bLine, bIdx) => (
+                <p key={bIdx} className="text-[11.5px] leading-relaxed text-muted-foreground">
+                  {renderInlineSpans(bLine)}
+                </p>
+              ))}
+            </div>
+          </div>
+        )
+        calloutBuffer = []
+      }
+    }
+
     for (let lIdx = 0; lIdx < lines.length; lIdx++) {
       const rawLine = lines[lIdx]
       const trimmed = rawLine.trim()
 
       if (!trimmed) {
         flushList()
+        flushCallout()
         continue
+      }
+
+      // Blockquotes and Alerts (> [!WARNING] or > **Title**)
+      if (trimmed.startsWith(">")) {
+        flushList()
+        calloutBuffer.push(trimmed)
+        continue
+      } else {
+        flushCallout()
       }
 
       // Heading 3: ### Title
@@ -359,6 +439,7 @@ export function MessageItem({
     }
 
     flushList()
+    flushCallout()
     return (
       <div key={blockKey} className="space-y-0.5">
         {elements}

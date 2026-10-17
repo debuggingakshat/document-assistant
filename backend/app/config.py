@@ -66,3 +66,9 @@ if effective_gemini_key:
 
 if settings.openai_api_key:
     os.environ["OPENAI_API_KEY"] = settings.openai_api_key
+
+def get_gemini_api_keys() -> list[str]:
+    """Return all valid, non-empty Gemini API keys for failover and rotation."""
+    raw = settings.gemini_api_key or settings.google_api_key or os.environ.get("GEMINI_API_KEY", "")
+    return [k.strip() for k in raw.split(",") if k.strip()]
+

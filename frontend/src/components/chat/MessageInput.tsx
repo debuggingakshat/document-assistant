@@ -11,22 +11,34 @@ import { cn } from "@/lib/utils"
 
 export const FREE_GEMINI_MODELS = [
   {
-    id: "gemini-2.5-flash",
-    name: "Gemini 2.5 Flash",
-    tag: "Fast & Smart",
-    desc: "Optimal speed & high quality reasoning for SEC 10-K analysis",
+    id: "gemini-3-flash-preview",
+    name: "Gemini 3 Flash",
+    tag: "Flagship",
+    desc: "Frontier reasoning & advanced synthetic disclosures",
   },
   {
-    id: "gemini-2.5-pro",
-    name: "Gemini 2.5 Pro",
-    tag: "Deep Reasoning",
-    desc: "Maximum depth & precision for complex financial tables & math",
+    id: "gemini-2.5-flash",
+    name: "Gemini 2.5 Flash",
+    tag: "Balanced",
+    desc: "Optimal speed & high quality financial reasoning",
+  },
+  {
+    id: "gemini-2.0-flash",
+    name: "Gemini 2.0 Flash",
+    tag: "Ultra Fast",
+    desc: "High-speed standard response generation",
   },
   {
     id: "gemini-2.0-flash-lite",
     name: "Gemini 2.0 Flash Lite",
-    tag: "Ultra Fast",
-    desc: "Lowest latency, lightweight quick answers",
+    tag: "Lowest Latency",
+    desc: "Lightweight quick answers & sub-second latency",
+  },
+  {
+    id: "gemini-3.1-flash-lite-preview",
+    name: "Gemini 3.1 Flash Lite",
+    tag: "500 RPD Quota",
+    desc: "High-capacity tier: 500 daily requests per key",
   },
 ] as const
 
@@ -39,7 +51,10 @@ export function MessageInput({ onSend, disabled }: MessageInputProps) {
   const [input, setInput] = useState("")
   const [selectedModel, setSelectedModel] = useState<string>(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("selected_llm_model") || "gemini-2.5-flash"
+      const saved = localStorage.getItem("selected_llm_model")
+      if (saved && FREE_GEMINI_MODELS.some((m) => m.id === saved)) {
+        return saved
+      }
     }
     return "gemini-2.5-flash"
   })

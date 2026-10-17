@@ -12,7 +12,13 @@ from typing import Any
 from supabase import Client
 
 from app.assistant.agent import DocumentAgentDeps, create_document_agent
-from app.assistant.model import FALLBACK_MODELS, get_llm_model
+from app.assistant.model import (
+    FALLBACK_MODELS,
+    MODEL_ALIASES,
+    MODEL_DISPLAY_NAMES,
+    get_llm_model,
+)
+from app.config import get_gemini_api_keys
 from pydantic_ai.models.google import GoogleModel
 from app.assistant.schemas import GroundedAnswer
 from pydantic_ai import Agent
@@ -133,28 +139,76 @@ async def _run_agent_with_failover(
     agent: Agent[DocumentAgentDeps, GroundedAnswer],
     user_content: str,
     deps: DocumentAgentDeps,
-) -> Any:
-    """Run agent with automatic failover to healthy models if high demand (503/429) occurs."""
-    primary_model_name = getattr(agent.model, "model_name", None) or "gemini-3-flash-preview"
+    requested_model_name: str | None = None,
+) -> tuple[Any, str]:
+    """Run agent with automatic 2D multi-key and multi-model failover (1,160+ daily queries capacity)."""
+    raw_model_attr = getattr(agent, "model", None)
+    model_name_attr = getattr(raw_model_attr, "model_name", None) if raw_model_attr else None
+    if isinstance(model_name_attr, str):
+        primary_model_name = model_name_attr
+    elif isinstance(requested_model_name, str):
+        primary_model_name = requested_model_name
+    else:
+        primary_model_name = "gemini-3-flash-preview"
+    target_primary_model = str(MODEL_ALIASES.get(primary_model_name, primary_model_name))
+
+    keys = get_gemini_api_keys()
+    if not keys:
+        keys = [None]
+
+    # 1. Try provided agent first (handles agent_override in tests)
     try:
-        return await asyncio.wait_for(agent.run(user_content, deps=deps), timeout=75.0)
-    except Exception as exc:
+        res = await asyncio.wait_for(agent.run(user_content, deps=deps), timeout=75.0)
+        return res, target_primary_model
+    except Exception as primary_exc:
         logger.warning(
-            "Primary agent run with %s failed with error: %s. Attempting fallback models...",
-            primary_model_name,
-            exc,
+            "Primary agent run with '%s' failed (%s: %s). Activating waterfall failover...",
+            target_primary_model,
+            type(primary_exc).__name__,
+            primary_exc,
         )
-        for fb_model_name in FALLBACK_MODELS:
-            if fb_model_name == primary_model_name:
+
+    # 2. Build waterfall candidate list (target model first, then remaining fallbacks)
+    candidate_models: list[str] = [target_primary_model]
+    for m in FALLBACK_MODELS:
+        if m not in candidate_models:
+            candidate_models.append(m)
+
+    last_exc = primary_exc
+    # 3. 2D Waterfall: Model x Key matrix
+    for model_candidate in candidate_models:
+        for key_idx, key in enumerate(keys):
+            if model_candidate == target_primary_model and key_idx == 0:
                 continue
             try:
-                await asyncio.sleep(1.5)
-                logger.info("Executing failover with healthy model: %s", fb_model_name)
-                fb_agent = create_document_agent(model=GoogleModel(fb_model_name))
-                return await asyncio.wait_for(fb_agent.run(user_content, deps=deps), timeout=75.0)
-            except Exception as fb_exc:
-                logger.warning("Failover model %s also encountered error: %s", fb_model_name, fb_exc)
-        raise exc
+                logger.info(
+                    "Waterfall failover: executing model '%s' (Key %d/%d)",
+                    model_candidate,
+                    key_idx + 1,
+                    len(keys),
+                )
+                model_inst = get_llm_model(model_candidate, api_key=key)
+                fallback_agent = create_document_agent(model=model_inst)
+                res = await asyncio.wait_for(fallback_agent.run(user_content, deps=deps), timeout=75.0)
+                logger.info(
+                    "Waterfall failover SUCCEEDED with model '%s' on Key %d",
+                    model_candidate,
+                    key_idx + 1,
+                )
+                return res, model_candidate
+            except Exception as loop_exc:
+                last_exc = loop_exc
+                logger.warning(
+                    "Waterfall failover model '%s' with Key %d encountered error (%s). Trying next...",
+                    model_candidate,
+                    key_idx + 1,
+                    loop_exc,
+                )
+                await asyncio.sleep(0.5)
+
+    logger.error("All models and keys exhausted in failover waterfall: %s", last_exc)
+    raise last_exc
+
 
 async def orchestrate_turn(
     client: Client,
@@ -208,8 +262,10 @@ async def orchestrate_turn(
         initial_passages=initial_passages,
     )
 
-    # 3. Run PydanticAI Gemini agent
-    agent_result = await _run_agent_with_failover(agent, user_content, deps)
+    # 3. Run PydanticAI Gemini agent with waterfall failover
+    agent_result, actual_model_used = await _run_agent_with_failover(
+        agent, user_content, deps, requested_model_name=model_name
+    )
     grounded_answer: GroundedAnswer = agent_result.output
 
     # 4. Enforce grounding verification
@@ -229,7 +285,7 @@ async def orchestrate_turn(
         final_answer_text += warning_msg
 
     # 5. Persist assistant message with model & parent linkage
-    asst_metadata: dict[str, Any] = {"model": model_name or "gemini-2.5-flash"}
+    asst_metadata: dict[str, Any] = {"model": actual_model_used}
     if parent_user_message_id:
         asst_metadata["parent_user_message_id"] = str(parent_user_message_id)
 
@@ -472,12 +528,9 @@ async def stream_orchestrated_turn(
         conversation_history=conversation_history_str,
     )
 
-    active_llm_name = model_name or "gemini-2.5-flash"
-    llm_display_label = {
-        "gemini-2.5-flash": "Gemini 2.5 Flash",
-        "gemini-2.5-pro": "Gemini 2.5 Pro",
-        "gemini-2.0-flash-lite": "Gemini 2.0 Flash Lite",
-    }.get(active_llm_name, active_llm_name)
+    active_llm_name = model_name or "gemini-3-flash-preview"
+    target_primary_name = MODEL_ALIASES.get(active_llm_name, active_llm_name)
+    llm_display_label = MODEL_DISPLAY_NAMES.get(target_primary_name, target_primary_name)
 
     # Step 3: PydanticAI Reasoning
     yield format_ai_sdk_status_part(
@@ -486,15 +539,17 @@ async def stream_orchestrated_turn(
         message=f"Injecting verified context window into {llm_display_label} system prompt. Synthesizing disclosures and extracting financial metrics under Meridian Research compliance directives...",
         technical_details={
             "orchestrator": "PydanticAI v2.52.0",
-            "llm": active_llm_name,
+            "llm": target_primary_name,
             "system_prompt": "Meridian Research Trust Directives",
             "compliance": "Strict corpus grounding, no non-causal speculation",
         },
     )
 
-    # 3. Run PydanticAI Gemini agent
+    # 3. Run PydanticAI Gemini agent with waterfall failover
     try:
-        agent_result = await _run_agent_with_failover(agent, user_content, deps)
+        agent_result, actual_model_used = await _run_agent_with_failover(
+            agent, user_content, deps, requested_model_name=model_name
+        )
         grounded_answer: GroundedAnswer = agent_result.output
     except Exception as exc:
         logger.error("All models failed during generation: %s", exc)
@@ -543,7 +598,21 @@ async def stream_orchestrated_turn(
         final_answer_text += warning_msg
 
     # 5. Persist assistant message with model & parent linkage
-    asst_metadata: dict[str, Any] = {"model": model_name or "gemini-2.5-flash"}
+        # If auto-failover switched models, emit a smooth status update
+    if isinstance(actual_model_used, str) and actual_model_used != target_primary_name:
+        failover_label = MODEL_DISPLAY_NAMES.get(actual_model_used, actual_model_used)
+        yield format_ai_sdk_status_part(
+            stage="reasoning",
+            title=f"Auto-Routed to {failover_label}",
+            message=f"Primary model capacity reached. Smoothly synthesized answer via {failover_label}...",
+            technical_details={
+                "orchestrator": "PydanticAI Multi-Key Waterfall",
+                "llm": actual_model_used,
+                "status": "auto_failover_success",
+            },
+        )
+
+    asst_metadata: dict[str, Any] = {"model": actual_model_used}
     if parent_user_message_id:
         asst_metadata["parent_user_message_id"] = str(parent_user_message_id)
 
