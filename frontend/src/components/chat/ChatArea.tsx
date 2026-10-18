@@ -17,7 +17,6 @@ import {
   Search,
   Server,
   ShieldAlert,
-  Sparkles,
   TrendingUp,
   Zap,
 } from "lucide-react"
@@ -42,12 +41,12 @@ interface Turn {
   assistantVersions: Message[]
 }
 
-// Library of 24 institutional-grade starter research inquiries spanning all 5 issuers,
-// segment disclosures, capital allocation, and cross-company comparisons.
+// Institutional library of 36 curated research inquiries (12 sets of 3)
+// covering all 5 coverage issuers, audited line items, segment revenues, CapEx, cash flows, and cross-filing comparisons.
 const ALL_STARTER_PROMPTS = [
-  // Set 1: Flagship Core Disclosures
+  // Set 1: Apple Flagship Performance & Margins
   {
-    category: "Apple Financial Performance",
+    category: "Apple Segment Net Sales",
     icon: TrendingUp,
     question: "What were Apple's net sales for iPhone and Services in fiscal 2024?",
     tag: "AAPL FY2024 10-K",
@@ -105,7 +104,7 @@ const ALL_STARTER_PROMPTS = [
     tag: "GOOGL FY2024 MD&A",
   },
 
-  // Set 4: Amazon Commerce & AWS
+  // Set 4: Amazon Commerce & AWS Margins
   {
     category: "AWS Segment Operating Margins",
     icon: Server,
@@ -125,7 +124,7 @@ const ALL_STARTER_PROMPTS = [
     tag: "AMZN Non-GAAP FCF",
   },
 
-  // Set 5: Nvidia Blackwell, Customers & Margins
+  // Set 5: Nvidia Customers, Architecture & Margins
   {
     category: "Nvidia Customer Concentration",
     icon: ShieldAlert,
@@ -145,7 +144,7 @@ const ALL_STARTER_PROMPTS = [
     tag: "NVDA Compute Split",
   },
 
-  // Set 6: Apple Shareholder Return & Geographic Segments
+  // Set 6: Apple Capital Return & Geographic Markets
   {
     category: "Apple Share Buybacks & Dividends",
     icon: DollarSign,
@@ -204,10 +203,90 @@ const ALL_STARTER_PROMPTS = [
     question: "How much did Alphabet record in employee severance and related charges during 2023 and 2024?",
     tag: "GOOGL Restructuring",
   },
+
+  // Set 9: Research & Development (R&D) & Innovation Allocation
+  {
+    category: "Alphabet R&D Expenditure",
+    icon: Cpu,
+    question: "What were Alphabet's research and development (R&D) expenses in 2023 and 2024, and what percentage of revenue did it represent?",
+    tag: "GOOGL FY2024 R&D",
+  },
+  {
+    category: "Apple Wearables & Home Segment",
+    icon: BarChart3,
+    question: "What was the annual net sales trend for Apple's Wearables, Home, and Accessories segment from 2022 to 2024?",
+    tag: "AAPL Product Lines",
+  },
+  {
+    category: "Microsoft Office 365 Commercial",
+    icon: Building2,
+    question: "What drove revenue growth in Microsoft's Productivity and Business Processes segment and Office 365 Commercial in 2024?",
+    tag: "MSFT Office 365",
+  },
+
+  // Set 10: Logistics, Fulfillment & Infrastructure Costs
+  {
+    category: "Amazon Shipping & Fulfillment Costs",
+    icon: Server,
+    question: "How much did Amazon spend on fulfillment and shipping costs in 2023 and 2024, and what was the growth rate?",
+    tag: "AMZN Cost Structure",
+  },
+  {
+    category: "Nvidia Supply & Inventory Commitments",
+    icon: ShieldAlert,
+    question: "What were Nvidia's outstanding purchase obligations and inventory levels heading into fiscal 2025?",
+    tag: "NVDA Supply Chain",
+  },
+  {
+    category: "Google Services Operating Income",
+    icon: LineChart,
+    question: "What was the operating income and operating margin for Google Services (Search, YouTube, Android) in 2024?",
+    tag: "GOOGL Core Margins",
+  },
+
+  // Set 11: International Exposure & Foreign Exchange Headwinds
+  {
+    category: "Apple Foreign Currency Hedging",
+    icon: Globe,
+    question: "Did foreign currency exchange rate fluctuations create headwinds for Apple's net sales in fiscal 2023 or 2024?",
+    tag: "AAPL FX Disclosures",
+  },
+  {
+    category: "Amazon International Segment Performance",
+    icon: Megaphone,
+    question: "What was the operating income or loss for Amazon's International segment in 2022, 2023, and 2024?",
+    tag: "AMZN Global Retail",
+  },
+  {
+    category: "Microsoft Dividend Policy & Debt",
+    icon: DollarSign,
+    question: "How much total cash dividend per share did Microsoft declare and pay to common shareholders in fiscal 2024?",
+    tag: "MSFT Dividends",
+  },
+
+  // Set 12: Professional Valuation & Operating Leverage Metrics
+  {
+    category: "Nvidia Automotive Trajectory",
+    icon: Activity,
+    question: "What was Nvidia's Automotive revenue in fiscal 2024 and 2025, and what were the primary growth drivers?",
+    tag: "NVDA Automotive",
+  },
+  {
+    category: "Big Tech Employee Headcount Comparison",
+    icon: Layers,
+    question: "Compare the total full-time employee headcount disclosures of Microsoft, Apple, and Alphabet in their latest 10-K filings.",
+    tag: "Workforce Metrics",
+  },
+  {
+    category: "Alphabet Google Other Revenues",
+    icon: Search,
+    question: "What were Google subscriptions, platforms, and devices revenues (formerly Google Other) in 2024?",
+    tag: "GOOGL Subscriptions",
+  },
 ]
 
 const PROMPTS_PER_SET = 3
-const TOTAL_PROMPT_SETS = Math.ceil(ALL_STARTER_PROMPTS.length / PROMPTS_PER_SET)
+const TOTAL_PROMPT_SETS = 12
 
 export function ChatArea({ threadId }: ChatAreaProps) {
   const { messages, isLoading, isStreaming, pipelineStatus, error, sendMessage } =
@@ -215,15 +294,32 @@ export function ChatArea({ threadId }: ChatAreaProps) {
   const [selectedCitation, setSelectedCitation] = useState<Citation | null>(null)
   const [activeVersionMap, setActiveVersionMap] = useState<Record<string, number>>({})
 
-  // Rotating starter prompt state (cycles through 8 sets of 3 prompts)
+  // Internal rotating starter prompt state (cycles quietly through 12 sets of 3 prompts)
   const [promptSetIndex, setPromptSetIndex] = useState<number>(() => {
-    // Generate an initial random set index between 0 and TOTAL_PROMPT_SETS - 1
+    try {
+      const saved = sessionStorage.getItem("meridian_prompt_set_idx")
+      if (saved !== null) {
+        const next = (parseInt(saved, 10) + 1) % TOTAL_PROMPT_SETS
+        sessionStorage.setItem("meridian_prompt_set_idx", String(next))
+        return next
+      }
+    } catch {
+      // ignore storage access errors
+    }
     return Math.floor(Math.random() * TOTAL_PROMPT_SETS)
   })
 
-  // Whenever the user clicks "New Research" or changes threads, rotate to the next set
+  // Whenever the user clicks "New Research" or changes threads, automatically rotate internally to the next set
   useEffect(() => {
-    setPromptSetIndex((prev) => (prev + 1) % TOTAL_PROMPT_SETS)
+    setPromptSetIndex((prev) => {
+      const next = (prev + 1) % TOTAL_PROMPT_SETS
+      try {
+        sessionStorage.setItem("meridian_prompt_set_idx", String(next))
+      } catch {
+        // ignore
+      }
+      return next
+    })
   }, [threadId])
 
   const activePrompts = useMemo(() => {
@@ -387,26 +483,11 @@ export function ChatArea({ threadId }: ChatAreaProps) {
                 Institutional SEC 10-K analysis across Apple, Amazon, Alphabet, Microsoft, and Nvidia with fail-closed grounding verification.
               </p>
 
-              {/* Starter Question Header with Interactive Rotation Controls */}
-              <div className="mt-8 flex w-full max-w-2xl items-center justify-between px-0.5">
-                <div className="flex items-center gap-1.5 text-muted-foreground">
-                  <Sparkles className="size-3.5 text-amber-500" />
-                  <span className="text-[11px] font-semibold tracking-wider uppercase text-muted-foreground">
-                    Suggested Research Inquiries
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setPromptSetIndex((prev) => (prev + 1) % TOTAL_PROMPT_SETS)}
-                  className="group flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium text-muted-foreground transition-all hover:bg-muted/70 hover:text-foreground cursor-pointer"
-                  title="Cycle to another set of example prompts"
-                >
-                  <RotateCw className="size-3 transition-transform group-hover:rotate-180 duration-300" />
-                  <span>Shuffle prompts</span>
-                  <span className="font-mono text-[10px] text-muted-foreground/80">
-                    ({promptSetIndex + 1}/{TOTAL_PROMPT_SETS})
-                  </span>
-                </button>
+              {/* Starter Question Header - Clean institutional typography */}
+              <div className="mt-8 flex w-full max-w-2xl items-center px-0.5">
+                <p className="text-[11px] font-semibold tracking-wider uppercase text-muted-foreground/80">
+                  Suggested Research Inquiries
+                </p>
               </div>
 
               {/* Starter Question Cards */}
