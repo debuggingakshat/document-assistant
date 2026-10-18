@@ -32,7 +32,7 @@ import { cn } from "@/lib/utils"
 import { useChatStream } from "@/lib/useChatStream"
 
 interface ChatAreaProps {
-  threadId: string
+  threadId?: string
 }
 
 interface Turn {
@@ -321,6 +321,23 @@ export function ChatArea({ threadId }: ChatAreaProps) {
       return next
     })
   }, [threadId])
+
+  // Listen for explicit rotate requests (e.g. user clicked "New Research Thread" while already on draft view)
+  useEffect(() => {
+    function handleRotate() {
+      setPromptSetIndex((prev) => {
+        const next = (prev + 1) % TOTAL_PROMPT_SETS
+        try {
+          sessionStorage.setItem("meridian_prompt_set_idx", String(next))
+        } catch {
+          // ignore
+        }
+        return next
+      })
+    }
+    window.addEventListener("meridian_rotate_prompts", handleRotate)
+    return () => window.removeEventListener("meridian_rotate_prompts", handleRotate)
+  }, [])
 
   const activePrompts = useMemo(() => {
     const start = promptSetIndex * PROMPTS_PER_SET

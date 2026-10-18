@@ -87,7 +87,7 @@ async def list_threads(
 @router.post(
     "/threads", response_model=ThreadResponse, status_code=status.HTTP_201_CREATED
 )
-async def create_thread(
+def create_thread(
     body: CreateThreadRequest,
     user: Annotated[AuthenticatedUser, Depends(get_current_user)],
 ) -> dict[str, Any]:

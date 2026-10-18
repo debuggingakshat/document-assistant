@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import {
+  createThread,
   listMessageCitations,
   listMessages,
   type Citation,
@@ -20,9 +21,26 @@ export function useChatStream({ threadId }: UseChatStreamOptions) {
   const [pipelineStatus, setPipelineStatus] = useState<PipelineStatus | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  // Track the current active thread ID (initialized from route or set when draft creates a thread)
+  const [activeThreadId, setActiveThreadId] = useState<string | undefined>(threadId)
+  const justCreatedThreadIdRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    setActiveThreadId(threadId)
+  }, [threadId])
+
   // Load message history when threadId changes
   useEffect(() => {
     if (!threadId) {
+      setMessages([])
+      setIsLoading(false)
+      setError(null)
+      return
+    }
+
+    // If this thread was just created on the fly in draft mode, do not wipe/refetch
+    if (justCreatedThreadIdRef.current === threadId) {
+      justCreatedThreadIdRef.current = null
       return
     }
 
@@ -73,7 +91,7 @@ export function useChatStream({ threadId }: UseChatStreamOptions) {
       options?: { parentUserMessageId?: string }
     ) => {
       const trimmed = content.trim()
-      if (!trimmed || !threadId || isStreaming) return
+      if (!trimmed || isStreaming) return
 
       setError(null)
       setPipelineStatus({
@@ -85,9 +103,33 @@ export function useChatStream({ threadId }: UseChatStreamOptions) {
       const userMessageId = parentUserMessageId || `user-${Date.now()}`
       const assistantMessageId = `assistant-${Date.now()}`
 
+      let targetThreadId = activeThreadId || threadId
+
+      // If in draft mode (no thread exists yet), create the thread on the fly!
+      if (!targetThreadId) {
+        try {
+          const generatedTitle = trimmed.length > 55 ? trimmed.slice(0, 55) + "..." : trimmed
+          const newThread = await createThread(generatedTitle)
+          targetThreadId = newThread.id
+          setActiveThreadId(newThread.id)
+          justCreatedThreadIdRef.current = newThread.id
+
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(
+              new CustomEvent("meridian_thread_created", { detail: newThread })
+            )
+            window.history.replaceState(null, "", `/chat/${newThread.id}`)
+          }
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "Failed to initialize research thread")
+          setPipelineStatus(null)
+          return
+        }
+      }
+
       const initialAssistantMsg: Message = {
         id: assistantMessageId,
-        thread_id: threadId,
+        thread_id: targetThreadId,
         role: "assistant",
         content: "",
         created_at: new Date().toISOString(),
@@ -104,7 +146,7 @@ export function useChatStream({ threadId }: UseChatStreamOptions) {
       } else {
         const userMsg: Message = {
           id: userMessageId,
-          thread_id: threadId,
+          thread_id: targetThreadId,
           role: "user",
           content: trimmed,
           created_at: new Date().toISOString(),
@@ -126,7 +168,7 @@ export function useChatStream({ threadId }: UseChatStreamOptions) {
           method: "POST",
           headers,
           body: JSON.stringify({
-            threadId,
+            threadId: targetThreadId,
             messages: [{ role: "user", content: trimmed }],
             model: modelOverride || localStorage.getItem("selected_llm_model") || "gemini-2.5-flash",
             parentUserMessageId,
@@ -240,7 +282,7 @@ export function useChatStream({ threadId }: UseChatStreamOptions) {
         setPipelineStatus(null)
       }
     },
-    [threadId, isStreaming]
+    [activeThreadId, threadId, isStreaming]
   )
 
   return {

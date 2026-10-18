@@ -42,7 +42,6 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import {
-  createThread,
   deleteThread,
   listThreads,
   updateThread,
@@ -86,7 +85,6 @@ export function Sidebar({
   const [threads, setThreads] = useState<Thread[]>([])
   const [archivedThreads, setArchivedThreads] = useState<Thread[]>([])
   const [loading, setLoading] = useState(true)
-  const [creating, setCreating] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
 
   // Collapsed rail popover states
@@ -205,7 +203,7 @@ export function Sidebar({
     }
   }, [])
 
-  // Fetch active and archived threads on mount or when activeThreadId changes
+  // Fetch active and archived threads once on initial mount
   useEffect(() => {
     let isMounted = true
 
@@ -230,7 +228,22 @@ export function Sidebar({
     return () => {
       isMounted = false
     }
-  }, [activeThreadId])
+  }, [])
+
+  // Listen for newly created threads dispatched when a prompt is sent from draft mode
+  useEffect(() => {
+    function handleThreadCreated(e: Event) {
+      const newThread = (e as CustomEvent<Thread>).detail
+      if (newThread && newThread.id) {
+        setThreads((prev) => [newThread, ...prev.filter((t) => t.id !== newThread.id)])
+      }
+    }
+
+    window.addEventListener("meridian_thread_created", handleThreadCreated)
+    return () => {
+      window.removeEventListener("meridian_thread_created", handleThreadCreated)
+    }
+  }, [])
 
   // Filter & bucket threads by timeframe
   const filteredThreads = useMemo(() => {
@@ -275,17 +288,12 @@ export function Sidebar({
     }
   }, [filteredThreads])
 
-  async function handleNewChat() {
-    if (creating) return
-    setCreating(true)
-    try {
-      const thread = await createThread()
-      setThreads((prev) => [thread, ...prev])
-      navigate(`/chat/${thread.id}`)
-    } catch {
-      // Failed to create
-    } finally {
-      setCreating(false)
+  function handleNewChat() {
+    if (activeThreadId) {
+      navigate("/")
+    } else {
+      // Already at fresh / draft research view, cycle prompt suggestions
+      window.dispatchEvent(new CustomEvent("meridian_rotate_prompts"))
     }
   }
 
@@ -496,7 +504,6 @@ export function Sidebar({
                 <button
                   type="button"
                   onClick={() => void handleNewChat()}
-                  disabled={creating}
                   className="group relative flex size-9 items-center justify-center rounded-xl text-muted-foreground transition-all hover:bg-muted/70 hover:text-foreground cursor-pointer outline-none"
                   aria-label="New research thread"
                 >
@@ -873,7 +880,6 @@ export function Sidebar({
             <Button
               variant="outline"
               onClick={() => void handleNewChat()}
-              disabled={creating}
               className="w-full justify-start gap-2.5 rounded-xl border border-border/80 bg-card text-foreground shadow-2xs hover:bg-muted/70 hover:text-foreground cursor-pointer h-9 px-3 text-xs font-medium transition-colors"
             >
               <Plus className="size-4 text-muted-foreground" />
