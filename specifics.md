@@ -2,6 +2,58 @@
 
 ---
 
+## Master Table of Contents & Technical Study Roadmap
+
+This document serves as the comprehensive engineering specification, architectural blueprint, and interview preparation manual for **Document Assistant**. Below is the roadmap designed to guide your study sequentially from system topology down to mathematical formulations, empirical benchmarks, and staff-level interview defense.
+
+```
+STUDY PATHWAY (RECOMMENDED SEQUENCE):
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│ MODULE I: FOUNDATIONS & TOPOLOGY (SECTIONS 1–2)                                        │
+│   ├─► Section 1: Executive Summary & Mission Overview (The Business & Technical Mandate)│
+│   └─► Section 2: End-to-End System Architecture & Topological Flow (10-Step Lifecycle) │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│ MODULE II: INGESTION & HYBRID RETRIEVAL ENGINEERING (SECTIONS 3–5)                     │
+│   ├─► Section 3: Data Ingestion & Preprocessing Pipeline (SEC 10-K ETL & Table GFM)    │
+│   ├─► Section 4: Hybrid Retrieval Architecture & Rank Aggregation (RAG & RRF k=60)     │
+│   └─► Section 5: Conversational State Machine & Ticker Inheritance (Multi-Turn Logic)  │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│ MODULE III: AGENT REASONING, VALIDATION & CLIENT DELIVERY (SECTIONS 6–9)               │
+│   ├─► Section 6: PydanticAI Agent Reasoning Core (Structured Schemas & Tools)          │
+│   ├─► Section 7: The 4-Gate Fail-Closed Grounding Validator (Zero-Hallucination Policy)│
+│   ├─► Section 8: Compliance Guardrails & Scope Categorization (FINRA Rule 2210 Defense)│
+│   └─► Section 9: Real-Time Streaming & Client Protocol (SSE & Glassmorphic UI)         │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│ MODULE IV: EMPIRICAL BENCHMARKS & RESILIENCE (SECTIONS 10–13)                          │
+│   ├─► Section 10: Automated Empirical Benchmark Suite (60.0% → 66.7% → 80.0% Journey) │
+│   ├─► Section 11: Production Zero-Cost Deployment Architecture ($0.00 / Month Footprint)│
+│   ├─► Section 12: Verification & Reproducibility Guide (Running Benchmarks & Pytests)  │
+│   └─► Section 13: High-Availability Waterfall Cascade (2,160+ RPD Multi-Key/Model)     │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│ MODULE V: SENIOR TECHNICAL INTERVIEW MASTERY (SECTION 14)                              │
+│   └─► Section 14: Senior Engineering Interview Guide (Q1–Q15 Deep Institutional Q&A)   │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Table of Contents
+
+1. [1. Executive Summary & Mission Overview](#1-executive-summary--mission-overview) — *The business friction of equity research intake, zero-hallucination mandate, and foundational engineering principles.*
+2. [2. End-to-End System Architecture & Topological Flow](#2-end-to-end-system-architecture--topological-flow) — *Full-stack component diagram and the complete 10-step request-response lifecycle from browser to PostgreSQL.*
+3. [3. Data Ingestion & Preprocessing Pipeline (ETL)](#3-data-ingestion--preprocessing-pipeline-etl) — *Parsing 25 SEC 10-K filings, HTML table flattening, GFM header preservation across splits, and 6,739-chunk indexing.*
+4. [4. Hybrid Retrieval Architecture & Rank Aggregation (RAG)](#4-hybrid-retrieval-architecture--rank-aggregation-rag) — *Why dense vector search and sparse lexical search fail independently, RRF mathematical derivation ($k=60$), and neighbor expansion.*
+5. [5. Conversational State Machine & Ticker Inheritance](#5-conversational-state-machine--ticker-inheritance) — *Multi-turn dialogue state management, 6-turn sliding window history, and contextual pronoun/ticker resolution.*
+6. [6. PydanticAI Agent Reasoning Core](#6-pydanticai-agent-reasoning-core) — *Rust-backed schema enforcement, Gemini multi-model configuration, runtime retrieval tools, and structured JSON outputs.*
+7. [7. The 4-Gate Fail-Closed Grounding Validator](#7-the-4-gate-fail-closed-grounding-validator) — *Deterministic post-processing verification (UUID check, Ticker alignment, Footnote sync, Verbatim substring matching) and fail-closed actions.*
+8. [8. Compliance Guardrails & Scope Categorization](#8-compliance-guardrails--scope-categorization) — *Boundary defense separating in-scope 10-K disclosures from prohibited investment recommendations (FINRA Rule 2210) and corporate finance tutoring.*
+9. [9. Real-Time Streaming & Client Protocol](#9-real-time-streaming--client-protocol) — *Vercel AI SDK Data Stream protocol over SSE, live progress stepper, dynamic model badging, and glassmorphic warning cards.*
+10. [10. Automated Empirical Benchmark Suite & Testing Methodology](#10-automated-empirical-benchmark-suite--testing-methodology) — *Live 15-query test harness, the two-stage optimization journey (60.0% → 66.7% → 80.0%), and the failed heuristic re-ranker post-mortem.*
+11. [11. Production Zero-Cost Deployment Architecture ($0.00 / Month)](#11-production-zero-cost-deployment-architecture-000--month) — *Permanent $0.00 cloud deployment across Vercel Edge, Render, Supabase PostgreSQL, and Google AI Studio.*
+12. [12. Verification & Reproducibility Guide](#12-verification--reproducibility-guide) — *Step-by-step commands to run the live empirical benchmark suite and the 64-test backend test suite.*
+13. [13. High-Availability Multi-Model & Multi-Key Cascade (2,160+ RPD Architecture)](#13-high-availability-multi-model--multi-key-cascade-2160-rpd-architecture) — *The 2D waterfall matrix (7 models × 2 keys = 2,160+ requests/day), Model Fidelity Invariant, and real-time SSE route telemetry.*
+14. [14. Senior Engineering Technical Interview Mastery Guide (Deep-Dive Q&A)](#14-senior-engineering-technical-interview-mastery-guide-deep-dive-qa) — *15 institutional-grade interview questions & answers across retrieval, data engineering, validation, and production scaling.*
+
+---
+
 ## 1. Executive Summary & Mission Overview
 
 **Document Assistant** is an institutional-grade financial research engine engineered specifically for equity research analysts at **Meridian Research**. It conducts deep SEC 10-K filing analysis across five major institutional technology issuers:
@@ -28,6 +80,9 @@ Document Assistant solves this intake bottleneck by transforming static SEC EDGA
 2. **4-Gate Fail-Closed Verification**: Generated responses pass through four programmatic validation gates before reaching the analyst's screen. If any citation UUID is missing, if any ticker entity is mismatched, if any footnote marker is desynchronized, or if any cited quote does not exist verbatim in the source text, the response is blocked.
 3. **100% Free Production Deployment**: The entire full-stack system operates on a zero-cost cloud architecture ($0.00 / ₹0 monthly cost), utilizing generous free tiers from Vercel Edge, Render, Supabase PostgreSQL with `pgvector`, and Google AI Studio.
 4. **High-Availability 2D Waterfall Failover (2,160+ Free Daily Headroom)**: A dual-key and 5-model failover matrix guaranteeing zero user-facing errors or demand warnings. On quota exhaustion, the engine rotates API keys for the selected model first, cascading to fallback models only when both keys are exhausted, scaling free-tier capacity to 2,160+ requests/day at $0.00.
+
+> [!NOTE]
+> **Section Transition (Flow to Section 2)**: Having established the business problem and core engineering commandments, Section 2 illustrates how these components interconnect in the end-to-end topological architecture.
 
 ---
 
@@ -63,7 +118,7 @@ The application is architected as a modern, decoupled full-stack system designed
 │                    PERSISTENCE & EMBEDDING LAYER (SUPABASE)                      │
 │                                                                                  │
 │  Supabase PostgreSQL 15:                                                         │
-│  ├── document_chunks: 2,793 chunks + 768-dim vector embeddings                   │
+│  ├── document_chunks: 6,739 chunks + 768-dim vector embeddings                   │
 │  ├── HNSW Index: Fast approximate nearest neighbors via Cosine Distance (<=>)    │
 │  ├── Full-Text Search: tsvector + websearch_to_tsquery + ts_rank_cd              │
 │  ├── Bidirectional Links: prev_chunk_id & next_chunk_id foreign keys             │
@@ -105,6 +160,9 @@ When an equity analyst submits an inquiry to the Document Assistant, the system 
     - Citation payloads stream as `2:[{"type": "citations", ...}]`.
     - The client renders the markdown response, attaches clickable citation badges, and populates the slide-over Citation Inspection Drawer.
 
+> [!NOTE]
+> **Section Transition (Flow to Section 3)**: Now that the high-level request-response topology is established, Section 3 examines the foundational data engineering pipeline: ingesting, sanitizing, and chunking complex SEC EDGAR 10-K filings.
+
 ---
 
 ## 3. Data Ingestion & Preprocessing Pipeline (ETL)
@@ -117,7 +175,7 @@ Document Assistant implements a purpose-built ETL pipeline across four modular s
 [ Raw SEC EDGAR HTML ] (25 Filings, FY2021-2025 across 5 Issuers)
          │
          ▼
-[ Stage 1: HTML Sanitizer ] (`ingest/cleaner.py`)
+[ Stage 1: HTML Sanitizer ] (`backend/ingest/sec_table_cleaner.py`)
   - Strips XML/HTML boilerplate, header/footer artifacts, script/style tags
   - Decodes HTML entities (&nbsp;, &#8212;, &amp;) into UTF-8
   - Normalizes non-breaking spaces and unicode financial dashes
@@ -142,7 +200,7 @@ Document Assistant implements a purpose-built ETL pipeline across four modular s
 [ Stage 4: Multi-Key Embedding & Storage ] (`ingest/embedder.py`)
   - Computes 768-dim float vectors via Google AI Studio `gemini-embedding-001`
   - Multi-Key Rotation Pool: Rotates through API keys to bypass HTTP 429 quota limits
-  - Loads 2,793 chunks into Supabase PostgreSQL `document_chunks` table
+  - Loads all 6,739 chunks across 25 filings into Supabase PostgreSQL `document_chunks` table
   - Builds HNSW vector index (m=16, ef_construction=64) and tsvector FTS index
 ```
 
@@ -162,6 +220,9 @@ In an SEC 10-K, financial tables represent the core quantitative evidence. Stand
 
 ### Bidirectional Graph Linking
 Every chunk in `document_chunks` contains `prev_chunk_id` and `next_chunk_id` UUID foreign keys. When a table or section is split, the retrieval engine can perform **zero-latency context expansion** via a single SQL query (`WHERE id IN (prev_id, next_id)`), giving the LLM immediate access to footnotes and narrative commentary directly preceding or following the data table.
+
+> [!NOTE]
+> **Section Transition (Flow to Section 4)**: With all 6,739 structured chunks indexed in PostgreSQL, Section 4 details the hybrid retrieval mechanism that surfaces the exact financial evidence for analyst queries.
 
 ---
 
@@ -232,6 +293,9 @@ To solve the vocabulary mismatch between analyst terminology and formal SEC acco
 
 Crucially, **expansion is restricted strictly to formal accounting abbreviations**. Naive expansion of general words (e.g. expanding `"sales"` to `"revenue"`) was empirically proven to dilute semantic focus and reduce Top-1 precision.
 
+> [!NOTE]
+> **Section Transition (Flow to Section 5)**: Retrieval provides the relevant financial evidence for single turns, but real-world equity analysis requires continuous dialogue. Section 5 details the conversational state machine and active ticker inheritance.
+
 ---
 
 ## 5. Conversational State Machine & Ticker Inheritance
@@ -243,16 +307,19 @@ Institutional equity research involves continuous multi-turn dialogue. Analysts 
 
 To handle this without conversational drift or context bloat, the system implements a dual-layer conversational state machine:
 
-### 1. Sliding Window History Management (`app/assistant/chats.py`)
+### 1. Sliding Window History Management (`backend/app/database/chats.py`)
 - At the start of each turn, the orchestrator queries Supabase for the last 6 messages (`LIMIT 6`) belonging to the active thread.
 - Older messages are pruned from active inference, keeping token usage lean and preventing earlier topics from confusing the model's retrieval scope.
 - The 6 messages are formatted into a chronological dialogue block under `--- PRIOR CONVERSATION HISTORY ---`.
 
-### 2. Active Ticker Inheritance Engine (`app/assistant/orchestrator.py`)
+### 2. Active Ticker Inheritance Engine (`backend/app/chat/orchestrator.py`)
 The orchestrator executes `_extract_ticker_and_fy` using deterministic heuristics:
 - **Explicit Mention**: If the query contains an explicit ticker or company name (`AAPL`, `Apple`, `NVDA`, `Nvidia`, `MSFT`, `Microsoft`, `AMZN`, `Amazon`, `GOOGL`, `Alphabet`, `Google`), the ticker is locked.
 - **Implicit Antecedent Resolution**: If no company is mentioned, the engine scans the previous turns in the sliding window. If a single unambiguous ticker was the subject of the previous turn, the engine automatically inherits that ticker and applies it to the SQL query filter (`ticker = 'AAPL'`).
 - **Comparative Multi-Ticker Queries**: If the query mentions multiple tickers (e.g., *"Compare Microsoft Azure and Amazon AWS operating margins"*), the engine detects a comparative intent and sets `ticker = None`, allowing retrieval across the entire 25-filing corpus.
+
+> [!NOTE]
+> **Section Transition (Flow to Section 6)**: Once state and context are assembled, the engine triggers inference. Section 6 details the PydanticAI reasoning core, model cascading, and structured output schemas.
 
 ---
 
@@ -293,6 +360,9 @@ class GroundedAnswer(BaseModel):
     has_sufficient_evidence: bool
     refusal_reason: str | None
 ```
+
+> [!NOTE]
+> **Section Transition (Flow to Section 7)**: Generating a structured answer is only half the battle; ensuring institutional veracity is paramount. Section 7 presents the 4-gate fail-closed Grounding Validator that intercepts and verifies every candidate response.
 
 ---
 
@@ -349,11 +419,14 @@ If any validation gate fails:
 - If `strict=True`, the response is blocked from user display.
 - The orchestrator either regenerates the answer with explicit error feedback or returns an honest, compliant disclosure: *"I could not verify sufficient factual evidence in the official 10-K disclosures to answer this question with absolute certainty."*
 
+> [!NOTE]
+> **Section Transition (Flow to Section 8)**: Beyond verifying facts, an institutional system must know its legal and regulatory boundaries. Section 8 outlines the compliance guardrails enforcing FINRA Rule 2210.
+
 ---
 
 ## 8. Compliance Guardrails & Scope Categorization
 
-Document Assistant operates under strict institutional compliance guardrails configured in `app/assistant/scope.py`:
+Document Assistant operates under strict institutional compliance guardrails configured in `backend/app/assistant/instructions.md` and enforced in `backend/app/assistant/agent.py`:
 
 | Category | Trigger Queries | System Action & Response |
 | :--- | :--- | :--- |
@@ -361,6 +434,9 @@ Document Assistant operates under strict institutional compliance guardrails con
 | **Category B: Out-of-Universe Issuers** | *"What was Tesla's gross margin?"*, *"Summarize Netflix's 10-K"* | **Boundary Notice**: Informs the analyst that Meridian Research coverage is currently focused on AAPL, AMZN, GOOGL, MSFT, and NVDA (FY2021–FY2025). Offers to inspect any of the 5 covered issuers. |
 | **Category C: Corporate Finance Concepts** | *"What is capital budgeting?"*, *"Explain EBITDA vs Operating Income"*, *"What is WACC?"*, *"Explain ASC 606 revenue recognition"* | **Educational Bridge**: Provides a rigorous corporate finance definition; explains exactly where and how this concept manifests in SEC 10-K filings (e.g. Item 7 MD&A, Statement of Cash Flows); offers to inspect coverage companies' filings for live examples. |
 | **Category D: Non-Financial Domain Queries** | *"Who was Napoleon Bonaparte?"*, *"What are the symptoms of diabetes?"*, *"Give me a chocolate cake recipe"* | **Domain Refusal**: Declines politely; clarifies specialization in institutional equity research; redirects user to corporate finance or 10-K disclosure inquiries. |
+
+> [!NOTE]
+> **Section Transition (Flow to Section 9)**: Having secured the backend with validation and compliance gates, Section 9 details the real-time Server-Sent Events (SSE) streaming protocol and the frontend user experience.
 
 ---
 
@@ -386,13 +462,16 @@ Communication between the React client and FastAPI backend uses **Server-Sent Ev
 - **GFM Table Renderer (`FinancialTable.tsx`)**: Financial tables render with alternating row styles, right-aligned monetary values, copy-to-clipboard actions, and horizontal overflow scrolling for complex multi-year schedules.
 - **Coverage Status Header**: Displays active coverage issuers, covered fiscal years (2021–2025), and live system health.
 
+> [!NOTE]
+> **Section Transition (Flow to Section 10)**: A beautiful UI and rigorous architecture must be backed by empirical evidence. Section 10 details our automated test harness and the two-stage engineering journey that drove top-1 precision from 60.0% to 66.7% and ultimately to 80.0%.
+
 ---
 
 ## 10. Automated Empirical Benchmark Suite & Testing Methodology
 
 To guarantee that performance claims are **mathematically verified rather than estimated or made-up**, we engineered a dedicated empirical test harness: `backend/scripts/run_eval_benchmark.py`.
 
-This evaluation suite connects directly to the **live production Supabase database**, querying against all **2,793 ingested chunks** across the 25 SEC 10-K filings.
+This evaluation suite connects directly to the **live production Supabase database**, querying against all **6,739 ingested chunks** across the 25 SEC 10-K filings.
 
 ### How the Tests Were Executed
 1. **Live Database Integration**:
@@ -461,7 +540,7 @@ CUMULATIVE GAIN (0 -> 2)        |     +20.0%   |      +13.4%  |      +13.4%  | +
 ---
 
 #### Stage 0: The Initial Starting Baseline (60.0% Top-1 Precision)
-- **Architecture**: Pure dense vector search (`gemini-embedding-001` with 768-dimensional float vectors and cosine similarity `<=>`) over 2,793 ingested SEC chunks.
+- **Architecture**: Pure dense vector search (`gemini-embedding-001` with 768-dimensional float vectors and cosine similarity `<=>`) over 6,739 ingested SEC chunks.
 - **The Empirical Result**:
   - **Top-1 Precision**: **60.0%** (9 of 15 queries retrieved the correct disclosure at Rank 1).
   - **Top-5 Recall**: **73.3%** (11 of 15 queries contained the target disclosure within the top 5).
@@ -538,6 +617,9 @@ When presenting these benchmarks on a resume or in an institutional technical re
 | **Document Assistant** (GFM table cleaner, Item chunking, Hybrid RRF $k=60$, 4-Gate Validator) | **Meridian Research (25 Filings, 2,793 Chunks)** | **86.7%** | **80.0%** | **0.822** | **100% Provenance (0% Hallucinations)** | **$0.00 / Month** |
 | **Tier-1 Commercial Systems** (BloombergGPT, AlphaSense, Morgan Stanley Internal) | Institutional Equity Research | ~90% – 95% | ~75% – 82% | ~0.840 | < 1% Hallucinations | $100k+ / Year |
 
+> [!NOTE]
+> **Section Transition (Flow to Section 11)**: High retrieval precision is only viable if it can be sustained in production. Section 11 outlines our permanent $0.00/month cloud deployment topology.
+
 ---
 
 ## 11. Production Zero-Cost Deployment Architecture ($0.00 / Month)
@@ -551,6 +633,9 @@ The entire full-stack application is deployed and operated across production clo
 | **Database & Vectors** | **Supabase Free Tier** | PostgreSQL 15, `pgvector` HNSW indexes, full-text search, Row Level Security. | **$0.00** |
 | **Reasoning & Embeddings** | **Google AI Studio Free Tier** | 2 healthy API keys across 7 models (`gemini-3-flash-preview`, `gemini-3.8-flash`, `gemini-3.7-flash`, `gemini-3.6-flash`, `gemini-3.5-flash-lite`, `gemini-3.1-flash-lite-preview`, `gemini-flash-lite-latest`) delivering **2,160+ requests/day** with zero-cost failover. | **$0.00** |
 | **Test Suite** | **GitHub Actions / Local Pytest** | **64 / 64 unit and integration tests passing** (`pytest backend/tests`). | **$0.00** |
+
+> [!NOTE]
+> **Section Transition (Flow to Section 12)**: To independently verify these results, Section 12 provides the step-by-step reproducibility guide for running the live benchmarks and test suites.
 
 ---
 
@@ -580,6 +665,9 @@ All **64 / 64 unit and integration tests** will execute and pass, verifying:
 - `test_grounding.py`: 4-gate fail-closed grounding validation.
 - `test_scope.py`: Finance-exclusive domain compliance and refusal guardrails.
 - `test_orchestrator.py`: Ticker state machine and multi-turn inheritance.
+
+> [!NOTE]
+> **Section Transition (Flow to Section 13)**: To maintain 99.99% availability on free-tier infrastructure without hitting rate limits, Section 13 details the 2D waterfall failover cascade delivering 2,160+ requests/day.
 
 ---
 
@@ -642,6 +730,9 @@ User Query Submitted (e.g. Model = Gemini 3 Flash)
 - **Model Selector Dropdown** (`MessageInput.tsx`): Displays all 5 models with speed tags and quota descriptions. Persists analyst preference in `localStorage`.
 - **Pipeline Status Indicator** (`PipelineStatusIndicator.tsx`): Dynamically resolves the active model label from telemetry metadata or client selection, displaying `PydanticAI Reasoning with [Selected Model]`.
 - **Glassmorphic Callout Styler** (`MessageItem.tsx`): Uses a custom blockquote parser to format markdown `> [!WARNING]` and system notifications into elegant amber-bordered cards (`border-amber-500/35 bg-amber-500/10`) with `AlertTriangle` icons, eliminating unformatted markdown text and duplicate error banners.
+
+> [!NOTE]
+> **Section Transition (Flow to Section 14)**: Having mastered the entire end-to-end architecture, Section 14 provides the definitive Senior Engineering Technical Interview Mastery Guide, dissecting 15 deep-dive questions and institutional answers across the four core domains.
 
 ---
 
@@ -900,7 +991,7 @@ Naïve Chunking (Header Loss)           Our Structure-Aware Chunking (Header Inj
 #### Question 8: Walk me through the exact architecture of your 4-Gate Fail-Closed Grounding Validator. Why is programmatic verification superior to "LLM-as-a-judge" or self-reflection prompts?
 
 ##### Institutional Engineering Answer:
-"Our Grounding Verification engine (`backend/app/chat/validator.py`) enforces a deterministic, fail-closed barrier between the LLM generator and the analyst's screen.
+"Our Grounding Verification engine (`backend/app/grounding/validator.py`) enforces a deterministic, fail-closed barrier between the LLM generator and the analyst's screen.
 
 ```
 PydanticAI LLM Output
@@ -961,7 +1052,7 @@ Verified Institutional Response Streamed to Analyst
 ##### Institutional Engineering Answer:
 "Conversational state management in equity research requires balancing context memory (remembering that the analyst is discussing Apple) with clean topic separation (not contaminating Microsoft queries with Apple's financial chunks).
 
-1. **State Machine Architecture (`backend/app/chat/state.py`)**:
+1. **State Machine Architecture (`backend/app/chat/orchestrator.py`)**:
    - The session state tracks three core parameters:
      ```python
      class SessionState(BaseModel):
@@ -1060,9 +1151,9 @@ Verified Institutional Response Streamed to Analyst
 │ 2. Gemini 3.8 Flash            │ 20 RPD                 │ 20 RPD                 │ 40 RPD           │
 │ 3. Gemini 3.7 Flash            │ 20 RPD                 │ 20 RPD                 │ 40 RPD           │
 │ 4. Gemini 3.6 Flash            │ 20 RPD                 │ 20 RPD                 │ 40 RPD           │
-│ 5. Gemini 3.5 Flash Lite       │ 20 RPD                 │ 20 RPD                 │ 40 RPD           │
-│ 6. Gemini 3.1 Flash Lite Prev  │ 500 RPD (Workhorse)    │ 500 RPD (Workhorse)    │ 1,000 RPD        │
-│ 7. Gemini Flash Lite Latest    │ 500 RPD (Ultralight)   │ 500 RPD (Ultralight)   │ 1,000 RPD        │
+│ 5. Gemini 3.5 Flash Lite       │ 500 RPD (Workhorse)    │ 500 RPD (Workhorse)    │ 1,000 RPD        │
+│ 6. Gemini 3.1 Flash Lite Prev  │ 500 RPD (High-Cap)     │ 500 RPD (High-Cap)     │ 1,000 RPD        │
+│ 7. Gemini Flash Lite Latest    │ 20 RPD (Ultralight)    │ 20 RPD (Ultralight)    │ 40 RPD           │
 ├────────────────────────────────┴────────────────────────┴────────────────────────┼──────────────────┤
 │ COMBINED ZERO-COST DAILY CAPACITY                                                │ 2,200 RPD        │
 └──────────────────────────────────────────────────────────────────────────────────┴──────────────────┘
@@ -1133,7 +1224,7 @@ Verified Institutional Response Streamed to Analyst
 
 2. **Supabase PostgreSQL Connection Pool Management**:
    - Supabase's free tier imposes a strict maximum of **60 direct concurrent connections**. Unmanaged connection pooling causes `FATAL: remaining connection slots are reserved for non-replication superuser connections`.
-   - **The SQLAlchemy Pool Configuration (`backend/app/database.py`)**:
+   - **The SQLAlchemy Pool Configuration (`backend/app/retrieval/retriever.py` and `backend/app/database/supabase.py`)**:
      ```python
      engine = create_engine(
          DATABASE_URL,
