@@ -39,7 +39,7 @@ STUDY PATHWAY (RECOMMENDED SEQUENCE):
 
 1. [1. Executive Summary & Mission Overview](#1-executive-summary--mission-overview) — *The business friction of equity research intake, zero-hallucination mandate, and foundational engineering principles.*
 2. [2. End-to-End System Architecture & Topological Flow](#2-end-to-end-system-architecture--topological-flow) — *Full-stack component diagram and the complete 10-step request-response lifecycle from browser to PostgreSQL.*
-3. [3. Data Ingestion & Preprocessing Pipeline (ETL)](#3-data-ingestion--preprocessing-pipeline-etl) — *Parsing 25 SEC 10-K filings, HTML table flattening, GFM header preservation across splits, and 6,739-chunk indexing.*
+3. [3. Data Ingestion & Preprocessing Pipeline (ETL)](#3-data-ingestion--preprocessing-pipeline-etl) — *Parsing 25 SEC 10-K filings, HTML table flattening, GFM header preservation across splits, and 2,793-chunk indexing.*
 4. [4. Hybrid Retrieval Architecture & Rank Aggregation (RAG)](#4-hybrid-retrieval-architecture--rank-aggregation-rag) — *Why dense vector search and sparse lexical search fail independently, RRF mathematical derivation ($k=60$), and neighbor expansion.*
 5. [5. Conversational State Machine & Ticker Inheritance](#5-conversational-state-machine--ticker-inheritance) — *Multi-turn dialogue state management, 6-turn sliding window history, and contextual pronoun/ticker resolution.*
 6. [6. PydanticAI Agent Reasoning Core](#6-pydanticai-agent-reasoning-core) — *Rust-backed schema enforcement, Gemini multi-model configuration, runtime retrieval tools, and structured JSON outputs.*
@@ -118,7 +118,7 @@ The application is architected as a modern, decoupled full-stack system designed
 │                    PERSISTENCE & EMBEDDING LAYER (SUPABASE)                      │
 │                                                                                  │
 │  Supabase PostgreSQL 15:                                                         │
-│  ├── document_chunks: 6,739 chunks + 768-dim vector embeddings                   │
+│  ├── document_chunks: 2,793 chunks + 768-dim vector embeddings                   │
 │  ├── HNSW Index: Fast approximate nearest neighbors via Cosine Distance (<=>)    │
 │  ├── Full-Text Search: tsvector + websearch_to_tsquery + ts_rank_cd              │
 │  ├── Bidirectional Links: prev_chunk_id & next_chunk_id foreign keys             │
@@ -200,7 +200,7 @@ Document Assistant implements a purpose-built ETL pipeline across four modular s
 [ Stage 4: Multi-Key Embedding & Storage ] (`ingest/embedder.py`)
   - Computes 768-dim float vectors via Google AI Studio `gemini-embedding-001`
   - Multi-Key Rotation Pool: Rotates through API keys to bypass HTTP 429 quota limits
-  - Loads all 6,739 chunks across 25 filings into Supabase PostgreSQL `document_chunks` table
+  - Loads all 2,793 chunks across 25 filings into Supabase PostgreSQL `document_chunks` table
   - Builds HNSW vector index (m=16, ef_construction=64) and tsvector FTS index
 ```
 
@@ -222,7 +222,7 @@ In an SEC 10-K, financial tables represent the core quantitative evidence. Stand
 Every chunk in `document_chunks` contains `prev_chunk_id` and `next_chunk_id` UUID foreign keys. When a table or section is split, the retrieval engine can perform **zero-latency context expansion** via a single SQL query (`WHERE id IN (prev_id, next_id)`), giving the LLM immediate access to footnotes and narrative commentary directly preceding or following the data table.
 
 > [!NOTE]
-> **Section Transition (Flow to Section 4)**: With all 6,739 structured chunks indexed in PostgreSQL, Section 4 details the hybrid retrieval mechanism that surfaces the exact financial evidence for analyst queries.
+> **Section Transition (Flow to Section 4)**: With all 2,793 structured chunks indexed in PostgreSQL, Section 4 details the hybrid retrieval mechanism that surfaces the exact financial evidence for analyst queries.
 
 ---
 
@@ -472,7 +472,7 @@ Communication between the React client and FastAPI backend uses **Server-Sent Ev
 
 To guarantee that performance claims are **mathematically verified rather than estimated or made-up**, we engineered a dedicated empirical test harness: `backend/scripts/run_eval_benchmark.py`.
 
-This evaluation suite connects directly to the **live production Supabase database**, querying against all **6,739 ingested chunks** across the 25 SEC 10-K filings.
+This evaluation suite connects directly to the **live production Supabase database**, querying against all **2,793 ingested chunks** across the 25 SEC 10-K filings.
 
 ### How the Tests Were Executed
 1. **Live Database Integration**:
@@ -541,7 +541,7 @@ CUMULATIVE GAIN (0 -> 2)        |     +20.0%   |      +13.4%  |      +13.4%  | +
 ---
 
 #### Stage 0: The Initial Starting Baseline (60.0% Top-1 Precision)
-- **Architecture**: Pure dense vector search (`gemini-embedding-001` with 768-dimensional float vectors and cosine similarity `<=>`) over 6,739 ingested SEC chunks.
+- **Architecture**: Pure dense vector search (`gemini-embedding-001` with 768-dimensional float vectors and cosine similarity `<=>`) over 2,793 ingested SEC chunks.
 - **The Empirical Result**:
   - **Top-1 Precision**: **60.0%** (9 of 15 queries retrieved the correct disclosure at Rank 1).
   - **Top-5 Recall**: **73.3%** (11 of 15 queries contained the target disclosure within the top 5).
@@ -939,7 +939,7 @@ Naïve Chunking (Header Loss)           Our Structure-Aware Chunking (Header Inj
 
 2. **Zero Cost and Total Data Sovereignty**:
    - OpenAI's embedding API incurs per-token egress costs and violates data governance constraints common in institutional finance, where proprietary analyst queries and pre-release financial models cannot be dispatched to third-party commercial APIs.
-   - BGE-base runs entirely in-process using HuggingFace's `sentence-transformers`. Ingestion runs locally on Apple Silicon MPS (Metal Performance Shaders) or CPU, embedding 6,739 chunks in under 24 minutes at zero dollar cost.
+   - BGE-base runs entirely in-process using HuggingFace's `sentence-transformers`. Ingestion runs locally on Apple Silicon MPS (Metal Performance Shaders) or CPU, embedding 2,793 chunks in under 24 minutes at zero dollar cost.
 
 3. **The Asymmetric Query Prefix Invariant**:
    - BGE was trained using asymmetric contrastive learning with an explicit instruction prefix.
@@ -956,7 +956,7 @@ Naïve Chunking (Header Loss)           Our Structure-Aware Chunking (Header Inj
 
 ---
 
-#### Question 7: In `pgvector`, how does cosine distance `<=>` compare to inner product `<#>` and Euclidean L2 `<->`? What index type did you use (HNSW vs IVFFlat), and what are the trade-offs at your corpus scale (6,739 chunks)?
+#### Question 7: In `pgvector`, how does cosine distance `<=>` compare to inner product `<#>` and Euclidean L2 `<->`? What index type did you use (HNSW vs IVFFlat), and what are the trade-offs at your corpus scale (2,793 chunks)?
 
 ##### Institutional Engineering Answer:
 "1. **Mathematical Equivalence Under Unit Normalization**:
@@ -979,9 +979,9 @@ Naïve Chunking (Header Loss)           Our Structure-Aware Chunking (Header Inj
      - Constructs a multi-layer graph where lower layers contain fine-grained connections and upper layers provide long-range skips.
      - *Advantages*: Provides $> 98\%$ recall out-of-the-box without manual retraining, supports continuous incremental upserts, and exhibits $O(\log N)$ query complexity.
 
-3. **Production Trade-Offs at 6,739 Chunks**:
-   - At our current corpus scale of 25 SEC 10-K filings (6,739 chunks):
-     $$\text{Raw Vector Memory} = 6,739 \times 768 \times 4 \text{ bytes} \approx 20.7 \text{ MB}$$
+3. **Production Trade-Offs at 2,793 Chunks**:
+   - At our current corpus scale of 25 SEC 10-K filings (2,793 chunks):
+     $$\text{Raw Vector Memory} = 2,793 \times 768 \times 4 \text{ bytes} \approx 8.58 \text{ MB}$$
    - The entire HNSW graph index occupies under $35 \text{ MB}$ of RAM, fitting comfortably within Supabase's 500 MB free-tier memory limit.
    - Query latency with HNSW is sub-5 milliseconds. Even an exact sequential scan (`kNN`) at this scale executes in under 22 ms, ensuring zero bottleneck in the retrieval tier."
 
@@ -1248,13 +1248,13 @@ Verified Institutional Response Streamed to Analyst
 #### Question 15: If Meridian Research decided to scale Document Assistant from 5 issuers to all S&P 500 companies (500 issuers × 5 years = 2,500 filings, ~700,000 chunks) and 10,000 daily queries, what architectural bottlenecks would break first and how would you redesign the system?
 
 ##### Institutional Engineering Answer:
-"Scaling by two orders of magnitude—from 25 filings (6,739 chunks) to 2,500 filings (~700,000 chunks) and 10,000 queries/day—fundamentally transforms the bottleneck profile from an application-layer problem to an infrastructure-partitioning problem.
+"Scaling by two orders of magnitude—from 25 filings (2,793 chunks) to 2,500 filings (~280,000 chunks) and 10,000 queries/day—fundamentally transforms the bottleneck profile from an application-layer problem to an infrastructure-partitioning problem.
 
 ```
 Enterprise Scale Architecture (S&P 500 & 10,000 Daily Queries):
 ┌────────────────────────────────────────────────────────────────────────────────┐
 │ Ingestion Tier: Distributed Celery / Ray on GPU Spot Instances                 │
-│   - 2,500 SEC 10-K Filings ──► Partitioned Ingestion ──► 700K Chunks Embedded  │
+│   - 2,500 SEC 10-K Filings ──► Partitioned Ingestion ──► 280K Chunks Embedded  │
 └────────────────────────────────────────────────────────────────────────────────┘
                                         │
                                         ▼
@@ -1280,7 +1280,7 @@ Enterprise Scale Architecture (S&P 500 & 10,000 Daily Queries):
 ```
 
 1. **Bottleneck 1: Vector Index Memory & Scan Degradation**:
-   - *Current State*: 6,739 vectors fit in 21 MB of RAM.
+   - *Current State*: 2,793 vectors fit in 8.6 MB of RAM.
    - *At Scale*: 700,000 768-d vectors require $\sim 2.15 \text{ GB}$ of raw vector memory, and HNSW graph index structures require an additional $\sim 3.5 \text{ GB}$. A monolithic vector index will exceed RAM, causing disk thrashing and pushing search latency from 5 ms to $> 400 \text{ ms}$.
    - *Redesign Solution*: **Declarative Table Partitioning**:
      - Partition the `document_chunks` table by `ticker` or `sector`:

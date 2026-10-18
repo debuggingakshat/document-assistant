@@ -123,7 +123,7 @@ export function Sidebar({
       const saved = localStorage.getItem("sidebar_width")
       if (saved) {
         const parsed = parseInt(saved, 10)
-        if (!isNaN(parsed) && parsed >= 240 && parsed <= 500) {
+        if (!isNaN(parsed) && parsed >= 200 && parsed <= 500) {
           return parsed
         }
       }
@@ -137,8 +137,8 @@ export function Sidebar({
     if (!isResizing) return
 
     function handleMouseMove(e: globalThis.MouseEvent) {
-      // If user drags much slimmer (< 170px), snap-close the sidebar
-      if (e.clientX < 170) {
+      // If user drags much slimmer (< 150px), snap-close the sidebar
+      if (e.clientX < 150) {
         setIsResizing(false)
         if (onToggleCollapse) {
           onToggleCollapse()
@@ -146,19 +146,19 @@ export function Sidebar({
         return
       }
 
-      // Otherwise clamp width between 240px and 500px
-      const newWidth = Math.min(Math.max(e.clientX, 240), 500)
+      // Otherwise clamp width between 200px and 500px
+      const newWidth = Math.min(Math.max(e.clientX, 200), 500)
       setSidebarWidth(newWidth)
     }
 
     function handleMouseUp(e: globalThis.MouseEvent) {
       setIsResizing(false)
-      if (e.clientX < 180) {
+      if (e.clientX < 150) {
         if (onToggleCollapse) {
           onToggleCollapse()
         }
       } else {
-        const finalWidth = Math.min(Math.max(e.clientX, 240), 500)
+        const finalWidth = Math.min(Math.max(e.clientX, 200), 500)
         setSidebarWidth(finalWidth)
         localStorage.setItem("sidebar_width", String(finalWidth))
       }
@@ -904,7 +904,7 @@ export function Sidebar({
         </div>
 
         {/* Chronological + Pinned Thread List */}
-        <ScrollArea className="flex-1 px-3">
+        <ScrollArea className="flex-1 px-3 w-full min-w-0">
           {loading ? (
             <div className="space-y-2 py-4">
               <div className="h-8 animate-pulse rounded-lg bg-muted/60" />
@@ -1174,7 +1174,7 @@ export function Sidebar({
       <div
         key={thread.id}
         className={cn(
-          "group relative flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs transition-colors",
+          "group relative flex items-center justify-between gap-1.5 rounded-lg px-2.5 py-1.5 text-xs transition-colors w-full min-w-0 overflow-hidden",
           isActive
             ? "bg-accent font-medium text-accent-foreground shadow-2xs"
             : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
@@ -1182,7 +1182,7 @@ export function Sidebar({
       >
         <Link
           to={`/chat/${thread.id}`}
-          className="flex min-w-0 flex-1 items-center gap-2"
+          className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden"
         >
           <MessageSquare
             className={cn(
@@ -1190,80 +1190,90 @@ export function Sidebar({
               isActive ? "text-primary" : "opacity-60 group-hover:opacity-100"
             )}
           />
-          <span className="truncate">
+          <span className="truncate min-w-0 flex-1 block">
             {thread.title || "Untitled Analysis"}
           </span>
-          {thread.is_pinned && (
-            <Pin className="size-2.5 shrink-0 fill-current opacity-60 text-muted-foreground ml-auto" />
-          )}
         </Link>
 
-        {/* Thread Actions Dropdown Menu (Glitch-free popper anchor with gradient styling) */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation()
-              }}
-              className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground group-hover:opacity-100 data-[state=open]:opacity-100 focus:opacity-100 cursor-pointer outline-none"
-              title="Thread options"
-            >
-              <MoreHorizontal className="size-3.5" />
-            </button>
-          </DropdownMenuTrigger>
+        {/* Right-hand Action Area: Pinned icon, 3 dots menu, and active white dot */}
+        <div className="flex shrink-0 items-center gap-1 ml-auto pl-1">
+          {thread.is_pinned && (
+            <Pin className="size-2.5 shrink-0 fill-current opacity-60 text-muted-foreground" />
+          )}
 
-          {/* Solid Charcoal Mini Window (Inspired by reference screenshot) */}
-          <DropdownMenuContent
-            side="bottom"
-            align="end"
-            sideOffset={6}
-            className="w-48 rounded-2xl border border-zinc-200 bg-white p-1.5 text-zinc-900 shadow-xl dark:border-[#333333] dark:bg-[#212121] dark:text-[#ececec] dark:shadow-2xl dark:shadow-black/80"
-          >
-            <DropdownMenuItem
-              onClick={(e) => handleStartRename(e, thread)}
-              className="cursor-pointer gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-zinc-800 transition-colors hover:bg-zinc-100 hover:text-zinc-950 dark:text-[#ececec] dark:hover:bg-[#2c2c2c] dark:hover:text-white"
-            >
-              <Pencil className="size-3.5 opacity-80" />
-              <span>Rename</span>
-            </DropdownMenuItem>
+          <div className="relative flex size-6 shrink-0 items-center justify-center">
+            {/* Thread Actions Dropdown Menu (Glitch-free popper anchor with solid charcoal styling) */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                  }}
+                  className={cn(
+                    "flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-opacity hover:bg-muted hover:text-foreground cursor-pointer outline-none",
+                    // Visible on group hover, when menu is open, or on focus
+                    "opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 focus:opacity-100"
+                  )}
+                  title="Thread options"
+                >
+                  <MoreHorizontal className="size-3.5" />
+                </button>
+              </DropdownMenuTrigger>
 
-            <DropdownMenuItem
-              onClick={(e) => void handleTogglePin(e, thread)}
-              className="cursor-pointer gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-zinc-800 transition-colors hover:bg-zinc-100 hover:text-zinc-950 dark:text-[#ececec] dark:hover:bg-[#2c2c2c] dark:hover:text-white"
-            >
-              <Pin
-                className={cn(
-                  "size-3.5 opacity-80",
-                  thread.is_pinned && "fill-current text-primary"
-                )}
-              />
-              <span>{thread.is_pinned ? "Unpin" : "Pin"}</span>
-            </DropdownMenuItem>
+              <DropdownMenuContent
+                side="bottom"
+                align="end"
+                sideOffset={6}
+                className="w-48 rounded-2xl border border-zinc-200 bg-white p-1.5 text-zinc-900 shadow-xl dark:border-[#333333] dark:bg-[#212121] dark:text-[#ececec] dark:shadow-2xl dark:shadow-black/80"
+              >
+                <DropdownMenuItem
+                  onClick={(e) => handleStartRename(e, thread)}
+                  className="cursor-pointer gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-zinc-800 transition-colors hover:bg-zinc-100 hover:text-zinc-950 dark:text-[#ececec] dark:hover:bg-[#2c2c2c] dark:hover:text-white"
+                >
+                  <Pencil className="size-3.5 opacity-80" />
+                  <span>Rename</span>
+                </DropdownMenuItem>
 
-            <DropdownMenuSeparator className="my-1 -mx-1 h-px bg-zinc-200 dark:bg-[#333333]" />
+                <DropdownMenuItem
+                  onClick={(e) => void handleTogglePin(e, thread)}
+                  className="cursor-pointer gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-zinc-800 transition-colors hover:bg-zinc-100 hover:text-zinc-950 dark:text-[#ececec] dark:hover:bg-[#2c2c2c] dark:hover:text-white"
+                >
+                  <Pin
+                    className={cn(
+                      "size-3.5 opacity-80",
+                      thread.is_pinned && "fill-current text-primary"
+                    )}
+                  />
+                  <span>{thread.is_pinned ? "Unpin" : "Pin"}</span>
+                </DropdownMenuItem>
 
-            <DropdownMenuItem
-              onClick={(e) => void handleToggleArchive(e, thread)}
-              className="cursor-pointer gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-zinc-800 transition-colors hover:bg-zinc-100 hover:text-zinc-950 dark:text-[#ececec] dark:hover:bg-[#2c2c2c] dark:hover:text-white"
-            >
-              <Archive className="size-3.5 opacity-80" />
-              <span>Archive</span>
-            </DropdownMenuItem>
+                <DropdownMenuSeparator className="my-1 -mx-1 h-px bg-zinc-200 dark:bg-[#333333]" />
 
-            <DropdownMenuItem
-              onClick={(e) => void handleDeleteThread(e, thread.id)}
-              className="cursor-pointer gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-red-600 transition-colors hover:bg-red-500/10 hover:text-red-700 dark:text-[#ef4444] dark:hover:bg-red-500/15 dark:hover:text-[#f87171]"
-            >
-              <Trash2 className="size-3.5" />
-              <span>Delete</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+                <DropdownMenuItem
+                  onClick={(e) => void handleToggleArchive(e, thread)}
+                  className="cursor-pointer gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-zinc-800 transition-colors hover:bg-zinc-100 hover:text-zinc-950 dark:text-[#ececec] dark:hover:bg-[#2c2c2c] dark:hover:text-white"
+                >
+                  <Archive className="size-3.5 opacity-80" />
+                  <span>Archive</span>
+                </DropdownMenuItem>
 
-        {isActive && !isEditing && !thread.is_pinned && (
-          <span className="size-1.5 shrink-0 rounded-full bg-primary group-hover:hidden" />
-        )}
+                <DropdownMenuItem
+                  onClick={(e) => void handleDeleteThread(e, thread.id)}
+                  className="cursor-pointer gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-red-600 transition-colors hover:bg-red-500/10 hover:text-red-700 dark:text-[#ef4444] dark:hover:bg-red-500/15 dark:hover:text-[#f87171]"
+                >
+                  <Trash2 className="size-3.5" />
+                  <span>Delete</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Active indicator white dot: centered in the 24px box, visible when active and not hovering */}
+            {isActive && !isEditing && (
+              <span className="pointer-events-none absolute size-1.5 rounded-full bg-primary transition-opacity group-hover:opacity-0" />
+            )}
+          </div>
+        </div>
       </div>
     )
   }
