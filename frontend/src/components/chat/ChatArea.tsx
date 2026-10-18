@@ -1,11 +1,25 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import {
+  Activity,
   ArrowDown,
   ArrowUpRight,
+  BarChart3,
+  Building2,
+  Cloud,
   Cpu,
+  DollarSign,
   FileText,
+  Globe,
+  Layers,
+  LineChart,
+  Megaphone,
   RotateCw,
+  Search,
+  Server,
+  ShieldAlert,
+  Sparkles,
   TrendingUp,
+  Zap,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { MessageInput } from "@/components/chat/MessageInput"
@@ -28,7 +42,10 @@ interface Turn {
   assistantVersions: Message[]
 }
 
-const STARTER_PROMPTS = [
+// Library of 24 institutional-grade starter research inquiries spanning all 5 issuers,
+// segment disclosures, capital allocation, and cross-company comparisons.
+const ALL_STARTER_PROMPTS = [
+  // Set 1: Flagship Core Disclosures
   {
     category: "Apple Financial Performance",
     icon: TrendingUp,
@@ -47,13 +64,172 @@ const STARTER_PROMPTS = [
     question: "What drove Nvidia's Data Center revenue growth in fiscal 2024?",
     tag: "NVDA FY2024 10-K",
   },
+
+  // Set 2: Microsoft Cloud & AI Infrastructure
+  {
+    category: "Microsoft Cloud Revenue",
+    icon: Cloud,
+    question: "What was Microsoft Intelligent Cloud revenue and Azure growth rate in fiscal 2024?",
+    tag: "MSFT FY2024 10-K",
+  },
+  {
+    category: "Microsoft AI CapEx Spending",
+    icon: Building2,
+    question: "What were Microsoft's additions to property and equipment in fiscal 2024 to support cloud and AI?",
+    tag: "MSFT FY2024 CapEx",
+  },
+  {
+    category: "Commercial RPO Obligations",
+    icon: Layers,
+    question: "What was Microsoft's commercial remaining performance obligation (RPO) and recognition schedule in 2024?",
+    tag: "MSFT FY2024 RPO",
+  },
+
+  // Set 3: Alphabet Search Ecosystem & Cloud
+  {
+    category: "Google Cloud Profitability",
+    icon: Cloud,
+    question: "What was Google Cloud revenue and operating income across fiscal 2023 and 2024?",
+    tag: "GOOGL Cloud 10-K",
+  },
+  {
+    category: "YouTube Ad Breakdown",
+    icon: LineChart,
+    question: "What were YouTube advertising revenues in fiscal years 2022, 2023, and 2024?",
+    tag: "GOOGL FY2024 Segments",
+  },
+  {
+    category: "Google Traffic Acquisition (TAC)",
+    icon: DollarSign,
+    question: "What were Alphabet's Traffic Acquisition Costs (TAC) as a percentage of advertising revenues in 2024?",
+    tag: "GOOGL FY2024 MD&A",
+  },
+
+  // Set 4: Amazon Commerce & AWS
+  {
+    category: "AWS Segment Operating Margins",
+    icon: Server,
+    question: "What were AWS net sales and operating income in 2023 and 2024, and what were AWS margins?",
+    tag: "AMZN AWS Segments",
+  },
+  {
+    category: "Amazon Advertising Services",
+    icon: Megaphone,
+    question: "How much revenue did Amazon generate from Advertising Services in 2023 versus 2024?",
+    tag: "AMZN Ad Growth",
+  },
+  {
+    category: "Amazon Free Cash Flow Trajectory",
+    icon: BarChart3,
+    question: "What was Amazon's trailing 12-month Free Cash Flow in 2023 and 2024, and how was it calculated?",
+    tag: "AMZN Non-GAAP FCF",
+  },
+
+  // Set 5: Nvidia Blackwell, Customers & Margins
+  {
+    category: "Nvidia Customer Concentration",
+    icon: ShieldAlert,
+    question: "Did Customer A or Customer B account for more than 10% of Nvidia's total revenue in fiscal 2024 or 2025?",
+    tag: "NVDA Customer Notes",
+  },
+  {
+    category: "Nvidia Gross Margin Expansion",
+    icon: TrendingUp,
+    question: "How much did Nvidia's GAAP gross margin expand between fiscal 2023 and fiscal 2024, and why?",
+    tag: "NVDA FY2024 Margins",
+  },
+  {
+    category: "Nvidia Compute vs Networking",
+    icon: Activity,
+    question: "What was the breakdown between Compute revenue and Networking revenue in Nvidia's Data Center segment?",
+    tag: "NVDA Compute Split",
+  },
+
+  // Set 6: Apple Shareholder Return & Geographic Segments
+  {
+    category: "Apple Share Buybacks & Dividends",
+    icon: DollarSign,
+    question: "How much capital did Apple deploy toward common stock repurchases and dividends in fiscal 2024?",
+    tag: "AAPL Cash Return",
+  },
+  {
+    category: "Apple Greater China Trajectory",
+    icon: Globe,
+    question: "What were Apple's net sales in Greater China across fiscal years 2022, 2023, and 2024?",
+    tag: "AAPL Geographic",
+  },
+  {
+    category: "Apple Gross Margin Drivers",
+    icon: BarChart3,
+    question: "What primary factors drove Apple's products and services gross margin expansion in fiscal 2024?",
+    tag: "AAPL FY2024 MD&A",
+  },
+
+  // Set 7: Cross-Company Hyperscaler & AI Comparisons
+  {
+    category: "Cloud Hyperscaler Comparison",
+    icon: Server,
+    question: "Compare the revenue and growth trajectory of Amazon AWS, Microsoft Cloud, and Google Cloud in 2024.",
+    tag: "Cloud Titans FY24",
+  },
+  {
+    category: "AI Infrastructure CapEx Race",
+    icon: Zap,
+    question: "Compare the capital expenditures (CapEx) of Microsoft, Alphabet, and Amazon in fiscal 2024.",
+    tag: "Big Tech CapEx",
+  },
+  {
+    category: "Hardware Gross Margin Comparison",
+    icon: TrendingUp,
+    question: "Compare Apple's Products gross margin with Nvidia's overall gross margin in fiscal 2024.",
+    tag: "Hardware Margins",
+  },
+
+  // Set 8: Core Sanity Checks & Testing Prompts
+  {
+    category: "Apple Revenue & Net Income",
+    icon: Search,
+    question: "What was Apple's total net sales, gross margin, and net income in fiscal 2024?",
+    tag: "AAPL FY2024 Summary",
+  },
+  {
+    category: "Microsoft Gaming & Activision",
+    icon: Layers,
+    question: "How did the Activision Blizzard acquisition impact Microsoft's More Personal Computing segment in 2024?",
+    tag: "MSFT M&A Impact",
+  },
+  {
+    category: "Alphabet Headcount & Severance",
+    icon: FileText,
+    question: "How much did Alphabet record in employee severance and related charges during 2023 and 2024?",
+    tag: "GOOGL Restructuring",
+  },
 ]
+
+const PROMPTS_PER_SET = 3
+const TOTAL_PROMPT_SETS = Math.ceil(ALL_STARTER_PROMPTS.length / PROMPTS_PER_SET)
 
 export function ChatArea({ threadId }: ChatAreaProps) {
   const { messages, isLoading, isStreaming, pipelineStatus, error, sendMessage } =
     useChatStream({ threadId })
   const [selectedCitation, setSelectedCitation] = useState<Citation | null>(null)
   const [activeVersionMap, setActiveVersionMap] = useState<Record<string, number>>({})
+
+  // Rotating starter prompt state (cycles through 8 sets of 3 prompts)
+  const [promptSetIndex, setPromptSetIndex] = useState<number>(() => {
+    // Generate an initial random set index between 0 and TOTAL_PROMPT_SETS - 1
+    return Math.floor(Math.random() * TOTAL_PROMPT_SETS)
+  })
+
+  // Whenever the user clicks "New Research" or changes threads, rotate to the next set
+  useEffect(() => {
+    setPromptSetIndex((prev) => (prev + 1) % TOTAL_PROMPT_SETS)
+  }, [threadId])
+
+  const activePrompts = useMemo(() => {
+    const start = promptSetIndex * PROMPTS_PER_SET
+    return ALL_STARTER_PROMPTS.slice(start, start + PROMPTS_PER_SET)
+  }, [promptSetIndex])
 
   // Smart auto-scroll state
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -211,16 +387,38 @@ export function ChatArea({ threadId }: ChatAreaProps) {
                 Institutional SEC 10-K analysis across Apple, Amazon, Alphabet, Microsoft, and Nvidia with fail-closed grounding verification.
               </p>
 
+              {/* Starter Question Header with Interactive Rotation Controls */}
+              <div className="mt-8 flex w-full max-w-2xl items-center justify-between px-0.5">
+                <div className="flex items-center gap-1.5 text-muted-foreground">
+                  <Sparkles className="size-3.5 text-amber-500" />
+                  <span className="text-[11px] font-semibold tracking-wider uppercase text-muted-foreground">
+                    Suggested Research Inquiries
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPromptSetIndex((prev) => (prev + 1) % TOTAL_PROMPT_SETS)}
+                  className="group flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium text-muted-foreground transition-all hover:bg-muted/70 hover:text-foreground cursor-pointer"
+                  title="Cycle to another set of example prompts"
+                >
+                  <RotateCw className="size-3 transition-transform group-hover:rotate-180 duration-300" />
+                  <span>Shuffle prompts</span>
+                  <span className="font-mono text-[10px] text-muted-foreground/80">
+                    ({promptSetIndex + 1}/{TOTAL_PROMPT_SETS})
+                  </span>
+                </button>
+              </div>
+
               {/* Starter Question Cards */}
-              <div className="mt-8 grid w-full max-w-2xl gap-3 sm:grid-cols-3">
-                {STARTER_PROMPTS.map((item) => {
+              <div className="mt-2.5 grid w-full max-w-2xl gap-3 sm:grid-cols-3">
+                {activePrompts.map((item) => {
                   const Icon = item.icon
                   return (
                     <button
-                      key={item.category}
+                      key={item.category + item.tag}
                       type="button"
                       onClick={() => void sendMessage(item.question)}
-                      className="group flex flex-col justify-between rounded-xl border border-border/70 bg-card p-3.5 text-left shadow-2xs transition-all hover:border-foreground/30 hover:shadow-xs cursor-pointer"
+                      className="group flex flex-col justify-between rounded-xl border border-border/70 bg-card p-3.5 text-left shadow-2xs transition-all hover:border-foreground/30 hover:shadow-xs cursor-pointer hover:bg-accent/15"
                     >
                       <div>
                         <div className="flex items-center justify-between text-muted-foreground">
@@ -238,7 +436,7 @@ export function ChatArea({ threadId }: ChatAreaProps) {
                       </div>
 
                       <div className="mt-3 flex items-center gap-1 text-[10px] font-medium text-primary opacity-0 transition-opacity group-hover:opacity-100">
-                        <span>Ask query</span>
+                        <span>Run analysis</span>
                         <ArrowUpRight className="size-3" />
                       </div>
                     </button>
