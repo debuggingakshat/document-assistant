@@ -512,17 +512,44 @@ Document Assistant implements a tiered scope model:
 
 ---
 
-### Conversational Dynamics, Adaptive Brevity & Anti-Repetition Engine
+### Conversational Dynamics, Dynamic Thread Onboarding & Anti-Repetition Engine
 
-#### The Problem: The "Helpdesk Robot" Loop
-When an analyst sent conversational pleasantries or closing tokens (*"ok got it"*, *"no i don't have any question"*, *"bye"*), the assistant panicked due to the lack of a financial query and mechanically repeated its full job description and coverage universe (`Apple, Amazon, Alphabet, Microsoft, and NVIDIA`) across three sequential messages.
+#### The Problem: The "Helpdesk Robot" Loop vs. Over-Corrected Blank Greetings
+1. **The Repetitive Loop Antipattern**: When an analyst sent mid-conversation pleasantries or closing tokens (*"ok got it"*, *"no i don't have any question"*, *"bye"*), early prompts caused the assistant to mechanically repeat its full identity and all 5 coverage tickers across sequential messages like an IVR phone menu.
+2. **The Over-Correction Antipattern**: If greetings are unconditionally stripped down to 1-line generic replies (*"Hello, how can I help you today?"*), an analyst starting a brand-new research thread has no visibility into which companies are covered or what filing years exist in the corpus.
+3. **The Static Template Antipattern**: Conversely, if the system uses a rigid copy-paste script, every new thread feels artificial and robotic.
 
-#### The Engineering Solution: Proportional Brevity & Anti-Repetition Directives
-Under Directive 7 in `instructions.md`, the model is equipped with **Dialogue Act Tracking**:
-- **Acknowledgments** (*"ok"*, *"understood"*, *"makes sense"*): Responds with a 1-sentence confirmation (*"Understood."* or *"Glad that helped."*).
-- **Session Closures** (*"no i don't have any question"*, *"that's all for now"*, *"all good"*): Acknowledges completion gracefully (*"Sounds good! I'm here whenever you're ready for your next filing analysis."*).
-- **Farewells** (*"bye"*, *"have a great day"*): Warm, concise 1-sentence sign-off (*"Goodbye! Have a great day."*).
-- **Anti-Repetition Invariant**: The assistant is explicitly prohibited from repeating the 5-company parenthetical list across sequential conversational turns once established.
+#### The Engineering Solution: The Two-State Conversational Lifecycle
+
+Document Assistant implements a two-state lifecycle governed by `conversation_history` state awareness:
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│ State 1: Thread-Start Onboarding (Empty History / First Greeting)       │
+│ - Trigger: Turn 1 opener ("hi", "hello", "hi how are you", "who are you")│
+│ - Natural & Varied Orientation (Avoids rigid static templates):         │
+│   • Identifies as Meridian Research's Document Assistant (institutional│
+│     equity research assistant; explicitly avoids "co-pilot" buzzwords). │
+│   • Highlights the 5 coverage issuers: AAPL, AMZN, GOOGL, MSFT, NVDA.   │
+│   • Defines the timeline: SEC Form 10-K filings for FY2021 through FY2025.│
+│   • Outlines analytical capabilities: financial data extraction/comparison│
+│     (revenue, operating income, cash flows), corporate finance concepts,│
+│     and spreadsheet modeling formulas / financial math.                │
+│   • Concludes with an open, inviting research prompt.                  │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │ Turns 2+
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│ State 2: In-Flight Turns (Active History / Anti-Repetition Active)      │
+│ - Trigger: Follow-up turns, acknowledgments, closures, and farewells   │
+│ - Adaptive Brevity (Zero Robotic Repetition):                          │
+│   • Acknowledgments ("ok", "got it"): Natural 1-sentence confirmation.  │
+│   • Session Closure ("no questions"): Graceful 1-sentence sign-off.    │
+│   • Farewells ("bye"): Warm, concise 1-sentence closing.                │
+│   • Anti-Repetition Invariant: The 5-company list is never repeated    │
+│     during casual in-flight exchanges.                                 │
+└────────────────────────────────────────────────────────────────────────┘
+```
 
 > [!NOTE]
 > **Section Transition (Flow to Section 9)**: Having secured the backend with validation, compliance gates, and conversational ergonomics, Section 9 details the real-time Server-Sent Events (SSE) streaming protocol and the frontend user experience.
