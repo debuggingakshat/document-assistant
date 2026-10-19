@@ -449,8 +449,7 @@ export function MessageItem({
 
   // Format content with interactive GFM tables, HoverCards, and citation chips
   function renderFormattedContent(text: string) {
-    const hasGroundingWarning =
-      text.includes("[!WARNING]") || text.includes("Grounding Verification Alert")
+    const hasGroundingWarning = text.includes("Grounding Verification Alert")
 
     // Match Markdown Tables (header row + separator row + body rows)
     const tableRegex = /((?:^|\n)\|[^\n]+\|\r?\n\|[\s:|-]+\|\r?\n(?:\|[^\n]+\|\r?\n?)+)/g

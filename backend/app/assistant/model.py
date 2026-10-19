@@ -17,13 +17,13 @@ MODEL_ALIASES: dict[str, str] = {
     "gemini-3-flash": "gemini-3-flash-preview",
     "gemini-3.8-flash": "gemini-3.8-flash",
     "gemini-3.7-flash": "gemini-3.7-flash",
-    "gemini-3.6-flash": "gemini-3.6-flash",
-    "gemini-2.5-flash": "gemini-3.8-flash",  # Google 2.5/2.0 drop-in successor
-    "gemini-2.0-flash": "gemini-3.8-flash",
+    "gemini-3.6-flash": "gemini-3.7-flash",
+    "gemini-2.5-flash": "gemini-3.7-flash",  # Reliable balanced flash
+    "gemini-2.0-flash": "gemini-3-flash-preview",  # Fast, highly available preview
     "gemini-2.5-pro": "gemini-3.8-flash",
     "gemini-3.5-flash-lite": "gemini-3.5-flash-lite",
-    "gemini-3.1-flash-lite-preview": "gemini-3.1-flash-lite-preview",
-    "gemini-3.1-flash-lite": "gemini-3.1-flash-lite-preview",
+    "gemini-3.1-flash-lite-preview": "gemini-3.5-flash-lite",
+    "gemini-3.1-flash-lite": "gemini-3.5-flash-lite",
     "gemini-2.0-flash-lite": "gemini-flash-lite-latest",
     "gemini-flash-lite-latest": "gemini-flash-lite-latest",
     "gemini-flash-latest": "gemini-flash-latest",
@@ -32,12 +32,11 @@ MODEL_ALIASES: dict[str, str] = {
 # Dynamic fallback sequence unlocking 2,160+ RPD free capacity across dual keys
 FALLBACK_MODELS: list[str] = [
     "gemini-3-flash-preview",
-    "gemini-3.8-flash",
     "gemini-3.7-flash",
-    "gemini-3.6-flash",
+    "gemini-3.8-flash",
     "gemini-3.5-flash-lite",
-    "gemini-3.1-flash-lite-preview",
     "gemini-flash-lite-latest",
+    "gemini-flash-latest",
 ]
 
 # Display labels for UI and streaming telemetry
@@ -54,6 +53,7 @@ MODEL_DISPLAY_NAMES: dict[str, str] = {
     "gemini-3.1-flash-lite-preview": "Gemini 3.1 Flash Lite",
     "gemini-3.1-flash-lite": "Gemini 3.1 Flash Lite",
     "gemini-flash-lite-latest": "Gemini Flash Lite",
+    "gemini-flash-latest": "Gemini Flash",
 }
 
 

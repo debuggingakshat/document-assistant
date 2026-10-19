@@ -156,11 +156,14 @@ async def _run_agent_with_failover(
     if not keys:
         keys = [None]
 
+    last_exc: Exception | None = None
+
     # 1. Try provided agent first (handles agent_override in tests)
     try:
         res = await asyncio.wait_for(agent.run(user_content, deps=deps), timeout=75.0)
         return res, target_primary_model
     except Exception as primary_exc:
+        last_exc = primary_exc
         logger.warning(
             "Primary agent run with '%s' failed (%s: %s). Activating waterfall failover...",
             target_primary_model,
@@ -173,8 +176,6 @@ async def _run_agent_with_failover(
     for m in FALLBACK_MODELS:
         if m not in candidate_models:
             candidate_models.append(m)
-
-    last_exc = primary_exc
     # 3. 2D Waterfall: Model x Key matrix
     for model_candidate in candidate_models:
         for key_idx, key in enumerate(keys):
@@ -207,7 +208,9 @@ async def _run_agent_with_failover(
                 await asyncio.sleep(0.5)
 
     logger.error("All models and keys exhausted in failover waterfall: %s", last_exc)
-    raise last_exc
+    if last_exc:
+        raise last_exc
+    raise RuntimeError("All models and keys exhausted in failover waterfall")
 
 
 async def orchestrate_turn(
