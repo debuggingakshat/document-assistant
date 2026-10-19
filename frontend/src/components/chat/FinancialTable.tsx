@@ -98,7 +98,7 @@ export function FinancialTable({
   }
 
   return (
-    <div className="my-4 overflow-hidden rounded-xl border border-border/80 bg-card shadow-xs transition-all">
+    <div className="my-4 overflow-hidden rounded-xl border border-border/80 bg-card shadow-xs transition-all group/table">
       {/* Top Table Utility Toolbar */}
       <div className="flex items-center justify-between border-b border-border/60 bg-muted/50 px-3.5 py-2 text-xs">
         <div className="flex items-center gap-2 text-muted-foreground">
@@ -134,7 +134,7 @@ export function FinancialTable({
       </div>
 
       {/* Horizontal Scroll Table Wrapper */}
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto table-scrollbar pb-1.5">
         <table className="min-w-full divide-y divide-border/70 text-left text-[12.5px] border-collapse">
           <thead>
             <tr className="bg-muted/70 divide-x divide-border/40">
@@ -193,7 +193,7 @@ export function FinancialTable({
                       <td
                         key={colIdx}
                         className={cn(
-                          "px-3.5 py-2 whitespace-nowrap text-foreground/90",
+                          "px-3.5 py-2.5 whitespace-nowrap text-foreground/90",
                           isNum && "font-mono tabular-nums text-[12px]",
                           align === "right" && "text-right",
                           align === "center" && "text-center",
