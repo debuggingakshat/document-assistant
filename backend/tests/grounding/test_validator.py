@@ -234,3 +234,41 @@ def test_non_financial_domain_refusal() -> None:
     assert len(res.verified_citations) == 0
     assert len(res.invalid_citations) == 0
     assert len(res.errors) == 0
+
+
+def test_analyst_productivity_utility_validation() -> None:
+    """Analyst utilities (spelling checks, Excel formulas, financial math, conversational wrap-ups) validate cleanly without citations."""
+    validator = GroundingValidator(strict=True)
+
+    # 1. Spelling query
+    spelling_answer = GroundedAnswer(
+        answer="It is spelled renaissance (single 'n', double 's'). In finance, it commonly refers to Renaissance Technologies (RenTech).",
+        citations=[],
+        has_sufficient_evidence=True,
+        refusal_reason=None,
+    )
+    res_spelling = validator.validate(spelling_answer, [])
+    assert res_spelling.is_valid is True
+    assert len(res_spelling.errors) == 0
+
+    # 2. Excel formula query
+    formula_answer = GroundedAnswer(
+        answer="Use the formula: =(A4/A1)^(1/3) - 1 to calculate 3-year CAGR in Excel.",
+        citations=[],
+        has_sufficient_evidence=True,
+        refusal_reason=None,
+    )
+    res_formula = validator.validate(formula_answer, [])
+    assert res_formula.is_valid is True
+    assert len(res_formula.errors) == 0
+
+    # 3. Conversational wrap-up query
+    closure_answer = GroundedAnswer(
+        answer="Understood! I will be right here whenever you are ready for your next filing analysis.",
+        citations=[],
+        has_sufficient_evidence=True,
+        refusal_reason=None,
+    )
+    res_closure = validator.validate(closure_answer, [])
+    assert res_closure.is_valid is True
+    assert len(res_closure.errors) == 0

@@ -430,13 +430,46 @@ Document Assistant operates under strict institutional compliance guardrails con
 
 | Category | Trigger Queries | System Action & Response |
 | :--- | :--- | :--- |
-| **Category A: Trading Advice & Stock Picking** | *"Should I buy Apple stock?"*, *"What is your price target for NVDA?"*, *"Which stock will outperform?"* | **Strict Refusal**: Returns compliance disclaimer: *"As Meridian Research's Document Assistant, I cannot provide trading recommendations, buy/sell ratings, or price targets. My function is strictly to analyze and cite historical SEC 10-K disclosures."* |
+| **Category A: Trading Advice & Stock Picking** | *"Should I buy Apple stock?"*, *"What is your price target for NVDA?"*, *"Which stock will outperform?"* | **Strict Refusal**: Returns compliance disclaimer: *"As Meridian Research's Document Assistant, I cannot provide trading recommendations, buy/sell ratings, or price targets. My function is strictly to analyze and cite historical SEC 10-K disclosures."* (`refusal_reason: "Out of scope: trading advice"`) |
 | **Category B: Out-of-Universe Issuers** | *"What was Tesla's gross margin?"*, *"Summarize Netflix's 10-K"* | **Boundary Notice**: Informs the analyst that Meridian Research coverage is currently focused on AAPL, AMZN, GOOGL, MSFT, and NVDA (FY2021–FY2025). Offers to inspect any of the 5 covered issuers. |
-| **Category C: Corporate Finance Concepts** | *"What is capital budgeting?"*, *"Explain EBITDA vs Operating Income"*, *"What is WACC?"*, *"Explain ASC 606 revenue recognition"* | **Educational Bridge**: Provides a rigorous corporate finance definition; explains exactly where and how this concept manifests in SEC 10-K filings (e.g. Item 7 MD&A, Statement of Cash Flows); offers to inspect coverage companies' filings for live examples. |
-| **Category D: Non-Financial Domain Queries** | *"Who was Napoleon Bonaparte?"*, *"What are the symptoms of diabetes?"*, *"Give me a chocolate cake recipe"* | **Domain Refusal**: Declines politely; clarifies specialization in institutional equity research; redirects user to corporate finance or 10-K disclosure inquiries. |
+| **Category C: Corporate Finance Concepts** | *"What is capital budgeting?"*, *"Explain EBITDA vs Operating Income"*, *"What is WACC?"*, *"Explain ASC 606 revenue recognition"* | **Educational Bridge**: Provides a rigorous corporate finance definition; explains exactly where and how this concept manifests in SEC 10-K filings (e.g. Item 7 MD&A, Statement of Cash Flows); offers to inspect coverage companies' filings for live examples (`citations: []`, `has_sufficient_evidence: true`). |
+| **Category D: Non-Financial Domain Queries** | *"Who was Napoleon Bonaparte?"*, *"What are the symptoms of diabetes?"*, *"Give me a chocolate cake recipe"* | **Concise Domain Refusal**: Declines politely in 1–2 courteous sentences; clarifies specialization in institutional equity research without overwhelming the analyst with boilerplate walls of text (`refusal_reason: "Out of domain: non-financial topic"`). |
+| **Category E: Analyst Productivity & Financial Utility Suite** | *"is it renaissance or rennaissance?"*, *"How do I compute CAGR in Excel?"*, *"What does TSR stand for?"*, *"Convert 45 bps to percentage"* | **Direct Utility Execution**: Answers concisely, directly, and accurately in 1–3 clear sentences or a clean formula block without lecturing or refusing. Supports spelling, grammar, drafting polish, Excel modeling formulas (`=XIRR()`, `=INDEX(MATCH())`), financial acronyms, and basic math (`citations: []`, `has_sufficient_evidence: true`). |
+
+---
+
+### Tiered Guardrail Architecture & Analyst Utility Suite (Category E)
+
+In institutional equity research, an analyst's workflow is not limited solely to raw SEC retrieval. Analysts spend hours drafting research notes, building financial models in Excel, checking spelling/grammar on investment memos, and verifying industry acronyms. 
+
+#### The Problem: Hyper-Rigid Refusals & The "Lobotomized Assistant" Antipattern
+Early production guardrails classified any query not directly mentioning financial statements as "Out of Domain" (Category D). When an analyst asked a 2-second spelling or terminology question (e.g., *"is it renaissance or rennaissance?"*), the assistant threw a jarring 2-paragraph compliance refusal claiming it was strictly forbidden from discussing non-financial topics.
+
+#### The Engineering Solution: Tiered Operational Scopes
+Document Assistant implements a tiered scope model:
+1. **Tier 1 (Factual SEC Filings — In-Universe)**: Strict corpus grounding, mandatory in-line citations `[^1]`, verbatim snippet matching, and 4-gate verification.
+2. **Tier 2 (Analyst Editorial & Financial Modeling Utilities — Category E)**: Direct execution for spelling, grammar, drafting polish, Excel formulas, financial acronyms, and deterministic math. Verified cleanly with `has_sufficient_evidence: true` and zero citations.
+3. **Tier 3 (True Out-of-Domain & Compliance Prohibitions — Categories A & D)**: Stock advice and non-work inquiries (medical, pop culture, history) receive a courteous, 1-sentence refusal.
+
+> [!IMPORTANT]
+> **Strict Grounding Invariant**: Category E utilities are strictly forbidden from fabricating or estimating company-specific filing numbers under the guise of math or formulas. For company-specific metrics, facts MUST originate from retrieved 10-K passages.
+
+---
+
+### Conversational Dynamics, Adaptive Brevity & Anti-Repetition Engine
+
+#### The Problem: The "Helpdesk Robot" Loop
+When an analyst sent conversational pleasantries or closing tokens (*"ok got it"*, *"no i don't have any question"*, *"bye"*), the assistant panicked due to the lack of a financial query and mechanically repeated its full job description and coverage universe (`Apple, Amazon, Alphabet, Microsoft, and NVIDIA`) across three sequential messages.
+
+#### The Engineering Solution: Proportional Brevity & Anti-Repetition Directives
+Under Directive 7 in `instructions.md`, the model is equipped with **Dialogue Act Tracking**:
+- **Acknowledgments** (*"ok"*, *"understood"*, *"makes sense"*): Responds with a 1-sentence confirmation (*"Understood."* or *"Glad that helped."*).
+- **Session Closures** (*"no i don't have any question"*, *"that's all for now"*, *"all good"*): Acknowledges completion gracefully (*"Sounds good! I'm here whenever you're ready for your next filing analysis."*).
+- **Farewells** (*"bye"*, *"have a great day"*): Warm, concise 1-sentence sign-off (*"Goodbye! Have a great day."*).
+- **Anti-Repetition Invariant**: The assistant is explicitly prohibited from repeating the 5-company parenthetical list across sequential conversational turns once established.
 
 > [!NOTE]
-> **Section Transition (Flow to Section 9)**: Having secured the backend with validation and compliance gates, Section 9 details the real-time Server-Sent Events (SSE) streaming protocol and the frontend user experience.
+> **Section Transition (Flow to Section 9)**: Having secured the backend with validation, compliance gates, and conversational ergonomics, Section 9 details the real-time Server-Sent Events (SSE) streaming protocol and the frontend user experience.
 
 ---
 
@@ -1093,16 +1126,19 @@ Verified Institutional Response Streamed to Analyst
 ##### Institutional Engineering Answer:
 "In institutional wealth management and equity research, providing unauthorized investment advice or citing non-public, unverified data violates SEC regulations and FINRA Rule 2210 (Communications with the Public). Document Assistant implements an upfront **Scope Categorization Engine** before retrieval occurs.
 
-1. **Three-Tier Scope Categorization**:
-   - **Tier 1: In-Scope Historical SEC Analysis**:
+1. **Multi-Tiered Scope Categorization & Ergonomic Guardrails**:
+   - **Tier 1: In-Scope Historical SEC Analysis (Strict Grounding)**:
      - Queries concerning audited financial statements, MD&A disclosures, risk factors, or segment operations for the 5 covered issuers across FY2021–FY2025.
-     - *Action*: Route to Hybrid RAG Pipeline.
-   - **Tier 2: Out-of-Scope Temporal / Intraday Queries**:
-     - Queries asking for real-time stock prices, quarterly 10-Q figures not in the corpus, or intraday news (*"What is NVDA trading at right now?"*).
-     - *Action*: Deterministic refusal: *"Document Assistant's corpus is strictly partitioned to audited SEC 10-K filings for fiscal years 2021 through 2025. Real-time market pricing and intra-quarter disclosures are outside current coverage."*
-   - **Tier 3: Prohibited Financial Advice & Forward-Looking Speculation**:
-     - Queries requesting price targets, buy/sell ratings, or stock recommendations (*"Is Apple a buy at $220?"*).
-     - *Action*: Hard compliance block: *"Document Assistant is an analytical research tool engineered for factual extraction from SEC filings. Under institutional compliance guidelines, the system is strictly prohibited from providing investment advice, price targets, or security recommendations."*
+     - *Action*: Route to Hybrid RAG Pipeline with mandatory in-line citations `[^1]` and 4-gate verification.
+   - **Tier 2: Analyst Productivity & Financial Utility Suite (Category E)**:
+     - Work queries supporting an analyst's modeling and reporting workflow: spelling checks (e.g., *"is it renaissance or rennaissance?"*), drafting polish, financial acronyms (ARR, EBITDA, WACC), Excel formulas (`=XIRR()`, `=INDEX(MATCH())`), and basic arithmetic conversions.
+     - *Action*: Direct execution without citations (`has_sufficient_evidence: true`), maintaining full grounding safety while eliminating the "lobotomized assistant" refusal antipattern.
+   - **Tier 3: Out-of-Universe Issuers (Category B)**:
+     - Non-covered companies (*"What was Tesla's margin?"*).
+     - *Action*: Inform of coverage boundary (AAPL, AMZN, GOOGL, MSFT, NVDA).
+   - **Tier 4: Prohibited Trading Advice & Out-of-Domain (Categories A & D)**:
+     - Stock recommendations, price targets, or non-work topics (medical, pop culture, history).
+     - *Action*: Courteous 1-sentence refusal without repetitive boilerplate walls.
 
 2. **System Prompt Enforcement**:
    - The reasoning prompt explicitly defines the persona as an institutional research assistant bound to factual disclosure:

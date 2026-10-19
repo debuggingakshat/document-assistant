@@ -197,6 +197,9 @@ def run_grounding_benchmark() -> dict[str, Any]:
         ("Scope: Trading Advice Refusal", GroundedAnswer(answer="As Meridian Research's Document Assistant, I cannot provide trading recommendations, buy/sell ratings, or price targets.", citations=[], has_sufficient_evidence=False, refusal_reason="Out of scope: trading advice"), [], True),
         ("Scope: Non-Financial Domain Refusal", GroundedAnswer(answer="As Meridian Research's Document Assistant, I specialize exclusively in institutional equity research. I cannot assist with history.", citations=[], has_sufficient_evidence=False, refusal_reason="Out of domain: non-financial topic"), [], True),
         ("Scope: Corporate Finance Concept Bridge", GroundedAnswer(answer="Capital budgeting is the process corporate management uses to evaluate long-term capital investments...", citations=[], has_sufficient_evidence=True, refusal_reason=None), [], True),
+        ("Scope: Analyst Utility (Spelling Check)", GroundedAnswer(answer="It is spelled renaissance (single 'n', double 's'). In finance, it commonly refers to Renaissance Technologies (RenTech).", citations=[], has_sufficient_evidence=True, refusal_reason=None), [], True),
+        ("Scope: Analyst Utility (Excel / Math)", GroundedAnswer(answer="Use the formula =(A4/A1)^(1/3) - 1 to compute 3-year CAGR in Excel.", citations=[], has_sufficient_evidence=True, refusal_reason=None), [], True),
+        ("Scope: Conversational Session Wrap-up", GroundedAnswer(answer="Understood! I'll be right here whenever you're ready for your next filing analysis.", citations=[], has_sufficient_evidence=True, refusal_reason=None), [], True),
     ]
 
     total_gate_tests = len(test_cases)
