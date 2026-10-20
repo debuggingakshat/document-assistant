@@ -109,7 +109,7 @@ export function useChatStream({ threadId }: UseChatStreamOptions) {
       if (!targetThreadId) {
         try {
           const cleanWords = trimmed.toLowerCase().replace(/[^\w\s]/g, "").split(/\s+/).filter(Boolean)
-          const greetingWords = new Set(["hi", "hello", "hey", "howdy", "greetings", "good", "morning", "afternoon", "evening", "day", "there", "how", "are", "you", "doing", "yo", "sup", "whatsup", "test", "ok", "okay", "bye", "goodbye", "thanks", "thank"])
+          const greetingWords = new Set(["hi", "hello", "hey", "howdy", "greetings", "good", "morning", "afternoon", "evening", "day", "there", "how", "are", "you", "doing", "yo", "sup", "whatsup", "test", "ok", "okay", "bye", "goodbye", "thanks", "thank", "all", "got", "it", "understood", "makes", "sense", "no", "that", "thats", "now", "fine", "great"])
           const isGreeting = cleanWords.length > 0 && cleanWords.length <= 6 && cleanWords.every((w) => greetingWords.has(w))
 
           const generatedTitle = isGreeting

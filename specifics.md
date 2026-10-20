@@ -487,10 +487,10 @@ Document Assistant operates under strict institutional compliance guardrails con
 | Category | Trigger Queries | System Action & Response |
 | :--- | :--- | :--- |
 | **Category A: Trading Advice & Stock Picking** | *"Should I buy Apple stock?"*, *"What is your price target for NVDA?"*, *"Which stock will outperform?"* | **Strict Refusal**: Returns compliance disclaimer: *"As Meridian Research's Document Assistant, I cannot provide trading recommendations, buy/sell ratings, or price targets. My function is strictly to analyze and cite historical SEC 10-K disclosures."* (`refusal_reason: "Out of scope: trading advice"`) |
-| **Category B: Out-of-Universe Issuers** | *"What was Tesla's gross margin?"*, *"Summarize Netflix's 10-K"* | **Boundary Notice**: Informs the analyst that Meridian Research coverage is currently focused on AAPL, AMZN, GOOGL, MSFT, and NVDA (FY2021–FY2025). Offers to inspect any of the 5 covered issuers. |
-| **Category C: Corporate Finance Concepts** | *"What is capital budgeting?"*, *"Explain EBITDA vs Operating Income"*, *"What is WACC?"*, *"Explain ASC 606 revenue recognition"* | **Educational Bridge**: Provides a rigorous corporate finance definition; explains exactly where and how this concept manifests in SEC 10-K filings (e.g. Item 7 MD&A, Statement of Cash Flows); offers to inspect coverage companies' filings for live examples (`citations: []`, `has_sufficient_evidence: true`). |
-| **Category D: Non-Financial Domain Queries** | *"Who was Napoleon Bonaparte?"*, *"What are the symptoms of diabetes?"*, *"Give me a chocolate cake recipe"* | **Concise Domain Refusal**: Declines politely in 1–2 courteous sentences; clarifies specialization in institutional equity research without overwhelming the analyst with boilerplate walls of text (`refusal_reason: "Out of domain: non-financial topic"`). |
-| **Category E: Analyst Productivity & Financial Utility Suite** | *"is it renaissance or rennaissance?"*, *"How do I compute CAGR in Excel?"*, *"What does TSR stand for?"*, *"Convert 45 bps to percentage"* | **Direct Utility Execution**: Answers concisely, directly, and accurately in 1–3 clear sentences or a clean formula block without lecturing or refusing. Supports spelling, grammar, drafting polish, Excel modeling formulas (`=XIRR()`, `=INDEX(MATCH())`), financial acronyms, and basic math (`citations: []`, `has_sufficient_evidence: true`). |
+| **Category B: Out-of-Universe Issuers** | *"What was Tesla's gross margin?"*, *"Summarize Netflix's 10-K"* | **Boundary Notice**: Informs the analyst that Meridian Research coverage is currently focused on AAPL, AMZN, GOOGL, MSFT, and NVDA (FY2021–FY2025). Never supplies remembered external figures as though they came from the indexed corpus. |
+| **Category C: Corporate Finance, Financial History & Regulatory Policy (Expanded)** | *"What caused the 2008 financial crisis, and how did political decisions affect the response?"*, *"Explain the Enron accounting scandal"*, *"What caused the 1987 crash?"*, *"Explain Dodd-Frank and Basel III"*, *"What is capital budgeting?"* | **Institutional Financial Synthesis**: Delivers in-depth, professional explanations of market crises, corporate accounting fraud (SPEs, mark-to-market manipulation), regulatory statutes, monetary policy, and macroeconomics. Discussions are strictly anchored in financial and economic mechanics. Operates citation-free (`citations: []`, `has_sufficient_evidence: true`) with zero hallucinated SEC badges. |
+| **Category D: Non-Financial Domain Queries** | *"Who was Napoleon Bonaparte?"*, *"What are the symptoms of diabetes?"*, *"Who won the 2022 World Cup?"* | **Concise Domain Refusal**: Declines politely in 1–2 courteous sentences; clarifies specialization in institutional equity research, financial history, and SEC disclosures without boilerplate walls of text (`refusal_reason: "Out of domain: non-financial topic"`). |
+| **Category E: Analyst Productivity & Financial Utility Suite** | *"is it renaissance or rennaissance?"*, *"How do I compute XIRR in Excel?"*, *"What does TSR stand for?"*, *"Convert 45 bps to percentage"* | **Direct Utility Execution**: Answers concisely, directly, and accurately in 1–3 clear sentences or a clean formula block without lecturing or refusing. Supports spelling, grammar, drafting polish, Excel modeling formulas (`=XIRR()`, `=INDEX(MATCH())`), financial acronyms, and basic math (`citations: []`, `has_sufficient_evidence: true`). |
 
 ---
 
@@ -509,6 +509,127 @@ Document Assistant implements a tiered scope model:
 
 > [!IMPORTANT]
 > **Strict Grounding Invariant**: Category E utilities are strictly forbidden from fabricating or estimating company-specific filing numbers under the guise of math or formulas. For company-specific metrics, facts MUST originate from retrieved 10-K passages.
+
+---
+
+### Broadened Financial Domain Coverage & 6-Gate Zero-Regression Routing Architecture
+
+In production institutional deployment, equity research analysts do not exclusively ask lookup questions about individual corporate 10-K filings. Real-world analytical inquiries frequently synthesize **financial history, market crises, corporate accounting fraud, macroeconomic monetary policy, and regulatory frameworks**. 
+
+#### The Dual Architecture Dilemma:
+1. **The Over-Filtering Trap (Hyper-Rigid Refusals)**: When an analyst asked *"What caused the 2008 financial crisis, and how did political and regulatory decisions shape the response?"*, earlier systems saw "crisis", "politics", and "history", triggering Category D blanket refusals because the system assumed anything non-10-K was "world history".
+2. **The Retrieval Contamination Trap (Ticker Inheritance Bleed)**: In multi-turn research, if an analyst previously inspected Apple (`AAPL`) and subsequently asked *"What caused the 2008 financial crisis?"*, naive conversation-state heuristics saw no company name and retroactively inherited `ticker = "AAPL"`. The retrieval engine was forced to query:
+   `retriever.retrieve(query="What caused the 2008 financial crisis? (AAPL)", ticker="AAPL")`
+   This injected Apple FY2021–FY2025 10-K passages into the prompt context, confusing the LLM and causing it to hallucinate connections between Apple's smartphone sales and the subprime mortgage collapse.
+3. **The Grounding Fabrication Trap**: If general financial history questions were forced through the 4-gate filing validator, either the validator failed closed (blocking legitimate historical explanations) or the LLM hallucinated fake SEC chunk IDs to satisfy validation rules.
+
+#### The Engineering Solution: The 6-Gate Intent-Aware Routing Engine
+
+Document Assistant implements a deterministic 6-gate routing architecture in `backend/app/chat/orchestrator.py` (`_classify_query_intent`) evaluated in strict priority order:
+
+```
+                                  Incoming User Inquiry
+                                            │
+                                            ▼
+                           ┌─────────────────────────────────┐
+                           │ Gate 1: Trading Advice Prohibit?│
+                           └────────────────┬────────────────┘
+                                            │ No
+                                            ▼
+                           ┌─────────────────────────────────┐
+                           │ Gate 2: Unindexed Issuer Check? │ (e.g. Tesla, Netflix)
+                           └────────────────┬────────────────┘
+                                            │ No
+                                            ▼
+                           ┌─────────────────────────────────┐
+                           │ Gate 3: Covered Issuer SEC RAG? │ (AAPL, AMZN, GOOGL, MSFT, NVDA)
+                           └────────────────┬────────────────┘
+                                            │ No
+                                            ▼
+                           ┌─────────────────────────────────┐
+                           │ Gate 4: Analyst Utility / Hello?│ (Excel =XIRR, spelling, greetings)
+                           └────────────────┬────────────────┘
+                                            │ No
+                                            ▼
+                           ┌─────────────────────────────────┐
+                           │ Gate 5: Substantive Finance?    │ (Crises, Enron, Dodd-Frank, Macro)
+                           └────────────────┬────────────────┘
+                                            │ No
+                                            ▼
+                           ┌─────────────────────────────────┐
+                           │ Gate 6: Domain Refusal (Cat D)  │ (Napoleon, medicine, sports)
+                           └─────────────────────────────────┘
+```
+
+1. **Gate 1 — Trading Advice Refusal (Category A)**: Queries asking for price targets, buy/sell recommendations, or forward stock speculation (e.g., *"Should I buy NVDA?"*) are immediately routed to compliance refusal without hitting the LLM reasoning core or retrieval pipelines.
+2. **Gate 2 — Unindexed Issuer Boundary (Category B)**: Inquiries asking for specific financial metrics or 10-K filings from unindexed issuers (e.g., *"What was Tesla's FY2024 gross margin?"*) are politely informed of Meridian's 5-issuer coverage universe (AAPL, AMZN, GOOGL, MSFT, NVDA). The system never supplies remembered external numbers as if they came from the indexed corpus.
+3. **Gate 3 — Covered Issuer SEC 10-K RAG (Unchanged Production Path)**:
+   - Covers explicit ticker inquiries, multi-company comparisons across coverage companies (e.g., *"Compare Microsoft and Amazon's reported results"*), and legitimate elliptical follow-ups.
+   - Executes the unchanged Tier-1 hybrid pipeline: Google `gemini-embedding-001` (768-d) + PostgreSQL `tsvector` FTS, Reciprocal Rank Fusion ($k=60$), table-aware ranking, ±1 neighboring-chunk expansion, and strict fail-closed 4-gate verification with mandatory verbatim citations.
+4. **Gate 4 — Analyst Productivity & Conversational Lifecycle (Categories E & Lifecycle)**:
+   - Executes formula syntax (`=XIRR()`), financial spelling (`renaissance`), financial math, and conversational lifecycle (onboarding, acknowledgments, and session wrap-ups) directly with zero retrieval overhead.
+5. **Gate 5 — Expanded General Finance, History & Regulatory Knowledge (Category C)**:
+   - **Scope**:
+     - *Financial History & Panics*: 2008 Global Financial Crisis (subprime lending, CDOs, CDS, Lehman collapse, TARP bailouts), 1987 Black Monday (portfolio insurance, program trading, circuit breakers), 1929 Great Crash, Dot-Com Crash (2000), LTCM, Tulip Mania, and South Sea Bubble.
+     - *Forensic Accounting & Corporate Scandals*: Enron accounting collapse (off-balance-sheet Special Purpose Entities / SPEs, mark-to-market contract manipulation, Arthur Andersen audit failure), WorldCom capitalization of operating line costs, Lehman Brothers Repo 105 transactions, Bernie Madoff Ponzi scheme, Wirecard, and financial fraud breakdowns.
+     - *Financial Regulation & Monetary Policy*: Sarbanes-Oxley (SOX), Dodd-Frank Act, Glass-Steagall, Volcker Rule, Basel I/II/III accords, SEC disclosure mandates, Federal Reserve interest rate cycles, quantitative easing/tightening, reserve requirements, discount window lending, and bank supervision.
+     - *Macroeconomics & Corporate Valuation*: Inflation, deflation, stagflation, CPI/PCE metrics, yield curve inversions, repo markets, liquidity crunches, WACC, DCF modeling, capital budgeting, CAPM, and ASC accounting standards.
+   - **Operational Protocol**: Operates with clean zero-retrieval context (`initial_passages = []`). Status streams transparently emit `Institutional Financial Synthesis` rather than claiming 10-K retrieval took place. The 4-gate validator verifies `citations: []` and passes cleanly with 0 errors.
+6. **Gate 6 — Concise Out-of-Domain Refusal (Category D)**:
+   - Inquiries devoid of any substantive financial purpose (e.g., *"Who was the first emperor of Rome?"*, cooking recipes, clinical medical advice) receive a polite, 1-to-2 sentence domain boundary refusal.
+
+---
+
+### The Ticker-Inheritance Decontamination Engine
+
+#### The Architectural Vulnerability
+In conversational RAG systems, follow-up resolution relies on inheriting the active entity from previous turns. If an analyst asks *"What was Apple's Services revenue in 2024?"* followed by *"What caused the 2008 financial crisis?"*, naive state machines treat the crisis inquiry as a follow-up to Apple, appending `(AAPL)` to the query and constraining retrieval to Apple's 10-K.
+
+#### The State-Aware Decontamination Guard
+In `backend/app/chat/orchestrator.py`, ticker inheritance is conditioned on intent classification:
+```python
+# Ticker inheritance ONLY triggers if the query is a recognized elliptical follow-up 
+# and is explicitly NOT a general finance topic, unindexed company, or analyst utility!
+if is_filing_query and intent == "sec_filing_rag_inherited":
+    for prev_msg in reversed(prior_messages):
+        prev_tickers = _extract_all_tickers(prev_msg.get("content", ""))
+        if len(prev_tickers) == 1:
+            ticker = list(prev_tickers)[0]
+            inherited_ticker = True
+            break
+```
+- **Filing Follow-Up Test**: *"How did that compare with 2023?"* after an Apple question successfully inherits `AAPL`, executing hybrid retrieval for Apple FY23.
+- **Topic Transition Test**: *"What caused the 2008 financial crisis?"* after an Apple question is classified as `general_finance`. Ticker inheritance is strictly bypassed (`ticker = None`), zero filing retrieval is performed, and the agent synthesizes macroeconomic history without Apple context window pollution.
+
+---
+
+### The Mixed-Query Grounding Invariant
+
+A major challenge in financial question-answering is the **mixed query**, where an analyst asks about a specific coverage issuer's disclosures while simultaneously requesting general financial education:
+> **Analyst Inquiry**: *"How did inflation affect Microsoft's reported margins, and what is inflation?"*
+
+Document Assistant resolves mixed queries through a dual-channel grounding contract:
+1. **Routing**: Because a covered issuer (`Microsoft` / `MSFT`) is detected, the query routes to **Gate 3 (SEC 10-K RAG)**.
+2. **Retrieval**: Hybrid dense/FTS retrieval pulls Microsoft's FY2024 10-K passages discussing operating income and cost/inflation pressures.
+3. **Dual Grounding Contract in System Prompt (`instructions.md`)**:
+   - The Microsoft-specific metrics (e.g. `$109,433 million` operating income) **MUST** be grounded in the retrieved passage and followed by an in-line citation `[^1]`.
+   - The general definition of inflation is supplied from general financial knowledge.
+   - **Crucial Safety Rule**: The SEC citation badge `[^1]` is strictly forbidden from being attached to the general definition of inflation, and the response must never claim that a corporate 10-K filing defines macroeconomic terms.
+4. **Validation**: The 4-gate validator verifies the Microsoft citation against retrieved chunk IDs. The general text contains no ungrounded citations, passing validation with 100% compliance.
+
+---
+
+### Path-Aware Transparent Status Emission
+
+Rather than showing a monolithic set of progress steps regardless of query type, `stream_orchestrated_turn` streams transparent status updates matching the path actually executed:
+
+| Query Path | Emitted SSE Status Stages | Technical Details Shown |
+| :--- | :--- | :--- |
+| **Covered SEC Filing RAG** | `searching` ──► `fusion` ──► `reasoning` ──► `validating` ──► `complete` | Embedding model, vector dimensions, FTS parser, RRF k=60, 4-gate safety checks, verified citation counts. |
+| **General Finance & History** | `reasoning` ──► `validating` ──► `complete` | Domain: Institutional Financial Knowledge, Scope: Financial History / Macro / Regulatory Policy, Zero-hallucination verification. |
+| **Analyst Productivity Utility** | `reasoning` ──► `complete` | Domain: Analyst Productivity Suite, Utility: Formulas / Math / Modeling syntax. |
+| **Conversational Lifecycle** | `reasoning` ──► `complete` | Mode: Conversational Lifecycle, Universe: 5 Issuers (FY21-FY25). |
+| **Compliance / Scope Refusal** | `reasoning` ──► `complete` | Compliance: Meridian Scope Directives, Policy: Refusal notice. |
 
 ---
 

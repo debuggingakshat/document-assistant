@@ -134,6 +134,188 @@ def _extract_ticker_and_fy(query: str) -> tuple[str | None, int | None]:
     return ticker, fiscal_year
 
 
+COVERED_TICKERS = {"AAPL", "AMZN", "GOOGL", "MSFT", "NVDA"}
+
+UNINDEXED_COMPANIES = {
+    "tesla", "tsla", "netflix", "nflx", "meta", "facebook", "uber",
+    "disney", "berkshire", "intel", "intc", "amd", "jpmorgan", "jpm",
+    "goldman", "goldman sachs", "boeing", "exxon", "walmart", "target",
+    "general electric", "ford", "gm", "general motors", "pfizer", "moderna",
+}
+
+TRADING_ADVICE_TRIGGERS = [
+    r"\bshould\s+i\s+(buy|sell|invest|short|hold|trade)\b",
+    r"\b(buy|sell|hold)\s+rating\b",
+    r"\bprice\s+target\b",
+    r"\bstock\s+recommendation\b",
+    r"\bis\s+[a-z0-9]+\s+a\s+(good\s+)?(buy|sell|investment)\b",
+    r"\bwhich\s+stock\s+should\s+i\b",
+]
+
+ANALYST_UTILITY_TRIGGERS = [
+    r"\b=(xirr|xnpv|irr|npv|index|match|sumifs|vlookup)\b",
+    r"\b(xirr|xnpv|irr|npv)\s+(formula|in\s+excel|in\s+google\s+sheets)\b",
+    r"\b(in|formula\s+in)\s+(excel|spreadsheet|sheets)\b",
+    r"\b(cagr|wacc)\s+formula\b",
+    r"\b(how\s+do\s+i\s+calculate|formula\s+for|how\s+to\s+calculate)\s+[a-z0-9\s()=]+\s+in\s+excel\b",
+    r"\b(is\s+it\s+[a-z]+\s+or\s+[a-z]+|spelling\s+of|how\s+to\s+spell|is\s+it\s+spelled|how\s+is\s+[a-z]+\s+spelled)\b",
+    r"\b(renaissance|rennaissance)\b",
+    r"\b(convert\s+\d+\s+bps|basis\s+points\s+to\s+percent)\b",
+]
+
+FINANCIAL_HISTORY_AND_MACRO_TRIGGERS = [
+    # Crises & market panics
+    r"\b(2008|subprime)\s+(financial\s+crisis|mortgage\s+crisis|crisis|collapse)\b",
+    r"\bfinancial\s+crisis\s+of\s+2008\b",
+    r"\b(1987|black\s+monday)\s+(market\s+)?(crash|panic)\b",
+    r"\b(1929|great)\s+(market\s+)?(crash|depression)\b",
+    r"\bdot[- ]?com\s+(bubble|crash)\b",
+    r"\b(tulip\s+mania|south\s+sea\s+bubble|panic\s+of\s+1907)\b",
+    r"\b(ltcm|long[- ]term\s+capital\s+management)\b",
+    r"\b(lehman\s+brothers|bear\s+stearns)\s+(collapse|bankruptcy|crisis)\b",
+    r"\b(subprime\s+mortgage|cdo|cds|credit\s+default\s+swap|mortgage[- ]backed\s+securit)\w*\b",
+    r"\b(tarp|troubled\s+asset\s+relief\s+program|bailout|bank\s+bailout)\b",
+    # Scandals & forensic accounting
+    r"\b(enron|worldcom|tyco|healthsouth|wirecard)\b",
+    r"\b(madoff|ponzi\s+scheme)\b",
+    r"\b(repo\s+105|accounting\s+scandal|accounting\s+fraud|financial\s+fraud)\b",
+    r"\b(special\s+purpose\s+entit\w*|spe\b|mark[- ]to[- ]market\s+accounting)\b",
+    # Regulation & central banking
+    r"\b(dodd[- ]frank|sarbanes[- ]oxley|sox\b|glass[- ]steagall|volcker\s+rule|basel\s+(i{1,3}|accords?))\b",
+    r"\b(federal\s+reserve|monetary\s+policy|quantitative\s+easing|quantitative\s+tightening|interest\s+rate\s+hike)\b",
+    r"\b(yield\s+curve\s+inversion|inverted\s+yield\s+curve|liquidity\s+crisis|credit\s+crunch)\b",
+    r"\b(capital\s+budgeting|wacc\b|discounted\s+cash\s+flow|dcf\b|capm\b|asc\s+(606|842|350)|goodwill\s+impairment)\b",
+]
+
+ELLIPTICAL_FOLLOWUP_INDICATORS = [
+    r"\b(they|their|them|that|those|it|its|this)\b",
+    r"\b(compare|compared|comparing|comparison|versus|vs\.?)\b",
+    r"\b(operating\s+margin|operating\s+income|net\s+income|revenue|sales|capex|cash\s+flow|segment)\b",
+    r"\b(202[0-5]|fy2[0-5]|prior\s+year|previous\s+year)\b",
+    r"^(and|what\s+about|how\s+about|why\s+did|did\s+they|break\s+down)\b",
+]
+
+FILING_METRIC_TERMS = [
+    r"\bservices\s+revenue\b",
+    r"\bnet\s+sales\b",
+    r"\bsegment\s+(operating\s+income|revenue|results)\b",
+    r"\boperating\s+income\b",
+    r"\bnet\s+income\b",
+    r"\bcloud\s+revenue\b",
+    r"\bcash\s+payments\s+for\s+property\b",
+    r"\bpurchases\s+of\s+property\b",
+    r"\bcapital\s+expenditures\b",
+    r"\bcapex\b",
+    r"\bshare\s+repurchases\b",
+    r"\bcash\s+dividends\b",
+    r"\bremaining\s+performance\s+obligations\b",
+    r"\brpo\b",
+    r"\bcustomer\s+concentration\b",
+    r"\bresearch\s+and\s+development\s+expense\b",
+    r"\br&d\s+expense\b",
+    r"\b10[- ]?k\b",
+    r"\bannual\s+report\b",
+    r"\bsec\s+filing\b",
+]
+
+GENERAL_FINANCE_KEYWORDS = [
+    "inflation", "deflation", "stagflation", "cpi", "recession",
+    "interest rate", "gdp", "central bank", "liquidity", "valuation",
+    "equity", "debt", "bond", "treasury", "wacc", "ebitda", "capital budgeting",
+    "amortization", "depreciation", "operating margin", "gross margin",
+    "financial crisis", "market crash", "ponzi scheme", "forensic accounting",
+]
+
+
+def _extract_all_tickers(query: str) -> set[str]:
+    query_upper = query.upper()
+    detected = set()
+    if "AAPL" in query_upper or "APPLE" in query_upper:
+        detected.add("AAPL")
+    if "NVDA" in query_upper or "NVIDIA" in query_upper:
+        detected.add("NVDA")
+    if "MSFT" in query_upper or "MICROSOFT" in query_upper:
+        detected.add("MSFT")
+    if "AMZN" in query_upper or "AMAZON" in query_upper:
+        detected.add("AMZN")
+    if (
+        "GOOGL" in query_upper
+        or "GOOG" in query_upper
+        or "ALPHABET" in query_upper
+        or "GOOGLE" in query_upper
+    ):
+        detected.add("GOOGL")
+    return detected
+
+
+def _classify_query_intent(
+    user_content: str,
+    prior_messages: list[dict[str, Any]],
+) -> str:
+    """Determine routing path for incoming query across Meridian's 6-Gate Architecture.
+    
+    Returns one of:
+      - 'trading_advice_refusal'
+      - 'unindexed_issuer_refusal'
+      - 'sec_filing_rag'
+      - 'sec_filing_rag_inherited'
+      - 'greeting_lifecycle'
+      - 'analyst_utility'
+      - 'general_finance'
+      - 'out_of_domain_refusal'
+    """
+    lower_query = user_content.lower().strip()
+    detected_tickers = _extract_all_tickers(user_content)
+
+    # 1. Trading advice refusal check
+    for pat in TRADING_ADVICE_TRIGGERS:
+        if re.search(pat, lower_query):
+            return "trading_advice_refusal"
+
+    # 2. Unindexed company check (only when no covered tickers are mentioned)
+    if not detected_tickers:
+        for comp in UNINDEXED_COMPANIES:
+            if re.search(rf"\b{comp}\b", lower_query):
+                return "unindexed_issuer_refusal"
+
+    # 3. Explicit covered ticker(s) or cross-company comparison (including mixed queries)
+    if len(detected_tickers) >= 1:
+        return "sec_filing_rag"
+
+    # 4. Analyst utilities & greetings (when no covered ticker explicitly mentioned)
+    if _is_low_information_greeting(user_content):
+        return "greeting_lifecycle"
+
+    for pat in ANALYST_UTILITY_TRIGGERS:
+        if re.search(pat, lower_query):
+            return "analyst_utility"
+
+    # 5. Check if it's a general finance, financial history, crisis, or regulatory query
+    is_gen_finance = any(re.search(pat, lower_query) for pat in FINANCIAL_HISTORY_AND_MACRO_TRIGGERS)
+
+    # 6. Check elliptical follow-up to prior filing conversation
+    # Crucial: NEVER inherit ticker if query is a general finance or unindexed topic!
+    if not is_gen_finance and prior_messages:
+        has_follow_up_signal = any(re.search(pat, lower_query) for pat in ELLIPTICAL_FOLLOWUP_INDICATORS)
+        if has_follow_up_signal:
+            for prev in reversed(prior_messages):
+                if _extract_all_tickers(prev.get("content", "")):
+                    return "sec_filing_rag_inherited"
+
+    if is_gen_finance:
+        return "general_finance"
+
+    # 7. Check for filing metric cues without ticker (e.g. "Services revenue?", "10-K filings")
+    if any(re.search(pat, lower_query) for pat in FILING_METRIC_TERMS):
+        return "sec_filing_rag"
+
+    # 8. Check for general finance terms/questions without filing context
+    if any(ft in lower_query for ft in GENERAL_FINANCE_KEYWORDS):
+        return "general_finance"
+
+    return "out_of_domain_refusal"
+
+
 
 async def _run_agent_with_failover(
     agent: Agent[DocumentAgentDeps, GroundedAnswer],
@@ -244,27 +426,51 @@ async def orchestrate_turn(
         )
         user_msg_id = uuid.UUID(str(user_msg["id"]))
 
-    # 2. Extract heuristics and run Phase 5 hybrid retrieval
-    ticker, fiscal_year = _extract_ticker_and_fy(user_content)
-    logger.info(
-        "Executing retrieval: query='%s', ticker=%s, fy=%s",
-        user_content,
-        ticker,
-        fiscal_year,
-    )
-    initial_passages = retriever.retrieve(
-        query=user_content,
-        ticker=ticker,
-        fiscal_year=fiscal_year,
-        top_n=5,
-        expand_neighbors=True,
-    )
+    # 2. Classify intent and conditionally run Phase 5 hybrid retrieval
+    history_records = list_messages(client=client, thread_id=thread_id)
+    prior_messages = [
+        m for m in history_records
+        if m.get("content") and m.get("content").strip() != user_content.strip()
+    ][-6:]
+    intent = _classify_query_intent(user_content, prior_messages)
+    is_filing_query = intent.startswith("sec_filing_rag")
+
+    ticker, fiscal_year = None, None
+    retrieval_query = user_content
+    if is_filing_query:
+        if intent == "sec_filing_rag_inherited":
+            _, fiscal_year = _extract_ticker_and_fy(user_content)
+            for prev_msg in reversed(prior_messages):
+                prev_tickers = _extract_all_tickers(prev_msg.get("content", ""))
+                if len(prev_tickers) == 1:
+                    ticker = list(prev_tickers)[0]
+                    break
+            if ticker and ticker not in user_content.upper():
+                retrieval_query = f"{user_content} ({ticker})"
+        else:
+            ticker, fiscal_year = _extract_ticker_and_fy(user_content)
+
+        logger.info(
+            "Executing filing retrieval: query='%s', ticker=%s, fy=%s",
+            retrieval_query,
+            ticker,
+            fiscal_year,
+        )
+        initial_passages = retriever.retrieve(
+            query=retrieval_query,
+            ticker=ticker,
+            fiscal_year=fiscal_year,
+            top_n=5,
+            expand_neighbors=True,
+        )
+    else:
+        logger.info("Non-filing intent '%s'; bypassing 10-K corpus retrieval", intent)
+        initial_passages = []
 
     deps = DocumentAgentDeps(
         retriever=retriever,
         initial_passages=initial_passages,
     )
-
     # 3. Run PydanticAI Gemini agent with waterfall failover
     agent_result, actual_model_used = await _run_agent_with_failover(
         agent, user_content, deps, requested_model_name=model_name
@@ -350,7 +556,8 @@ def _is_low_information_greeting(text: str) -> bool:
     greeting_words = {
         "hi", "hello", "hey", "howdy", "greetings", "good", "morning", "afternoon", "evening",
         "day", "there", "how", "are", "you", "doing", "yo", "sup", "whatsup", "test", "ok",
-        "okay", "bye", "goodbye", "thanks", "thank"
+        "okay", "bye", "goodbye", "thanks", "thank", "all", "got", "it", "understood",
+        "makes", "sense", "no", "that", "thats", "now", "fine", "great"
     }
     if len(words) <= 6 and all(w in greeting_words for w in words):
         return True
@@ -444,22 +651,32 @@ async def stream_orchestrated_turn(
         if m.get("content") and m.get("content").strip() != user_content.strip()
     ][-6:]
 
-    ticker, fiscal_year = _extract_ticker_and_fy(user_content)
+    # Classify query intent across Meridian 6-Gate Architecture
+    intent = _classify_query_intent(user_content, prior_messages)
+    is_filing_query = intent.startswith("sec_filing_rag")
 
-    # Inherit company ticker from recent thread history if not explicitly stated in follow-up
+    ticker, fiscal_year = None, None
     inherited_ticker = False
-    if not ticker and prior_messages:
-        for prev_msg in reversed(prior_messages):
-            prev_ticker, _ = _extract_ticker_and_fy(prev_msg.get("content", ""))
-            if prev_ticker:
-                ticker = prev_ticker
-                inherited_ticker = True
-                logger.info(
-                    "Inherited active ticker '%s' from conversation history in thread %s",
-                    ticker,
-                    thread_id,
-                )
-                break
+    retrieval_query = user_content
+
+    if is_filing_query:
+        if intent == "sec_filing_rag_inherited":
+            _, fiscal_year = _extract_ticker_and_fy(user_content)
+            for prev_msg in reversed(prior_messages):
+                prev_tickers = _extract_all_tickers(prev_msg.get("content", ""))
+                if len(prev_tickers) == 1:
+                    ticker = list(prev_tickers)[0]
+                    inherited_ticker = True
+                    logger.info(
+                        "Inherited active ticker '%s' from conversation history in thread %s",
+                        ticker,
+                        thread_id,
+                    )
+                    break
+            if ticker and ticker not in user_content.upper():
+                retrieval_query = f"{user_content} ({ticker})"
+        else:
+            ticker, fiscal_year = _extract_ticker_and_fy(user_content)
 
     # Build formatted conversation history for LLM prompt context
     conversation_history_str = ""
@@ -486,22 +703,6 @@ async def stream_orchestrated_turn(
             )
         )
 
-    # Step 1: Hybrid Retrieval
-    yield format_ai_sdk_status_part(
-        stage="searching",
-        title="Concurrent Hybrid Retrieval (FTS + pgvector)",
-        message="Embedding query via Google gemini-embedding-001 (768-d). Executing parallel tsvector FTS & pgvector cosine similarity search (<=>) in ThreadPoolExecutor...",
-        technical_details={
-            "embedding_model": "Google gemini-embedding-001",
-            "vector_dim": 768,
-            "fts_parser": "websearch_to_tsquery + ts_rank_cd",
-            "concurrency": "ThreadPoolExecutor (2 workers)",
-            "filter_ticker": ticker or "All Filings",
-            "filter_fy": fiscal_year or "All Years",
-            "conversation_memory": f"{len(prior_messages)} prior turns" if prior_messages else "New Session",
-        },
-    )
-
     # 1. Persist user message (reuse parent if regenerating)
     if parent_user_message_id:
         user_msg_id = parent_user_message_id
@@ -515,62 +716,122 @@ async def stream_orchestrated_turn(
         )
         user_msg_id = uuid.UUID(str(user_msg["id"]))
 
-    # 2. Extract heuristics and run Phase 5 hybrid retrieval
-    retrieval_query = user_content
-    if inherited_ticker and ticker and ticker not in user_content.upper():
-        retrieval_query = f"{user_content} ({ticker})"
+    active_llm_name = model_name or "gemini-3-flash-preview"
+    target_primary_name = MODEL_ALIASES.get(active_llm_name, active_llm_name)
+    llm_display_label = MODEL_DISPLAY_NAMES.get(target_primary_name, target_primary_name)
 
-    logger.info(
-        "Executing retrieval: query='%s', ticker=%s, fy=%s (history_turns=%d)",
-        retrieval_query,
-        ticker,
-        fiscal_year,
-        len(prior_messages),
-    )
-    initial_passages = retriever.retrieve(
-        query=retrieval_query,
-        ticker=ticker,
-        fiscal_year=fiscal_year,
-        top_n=5,
-        expand_neighbors=True,
-    )
+    # 2. Path-aware status emission and context preparation
+    if is_filing_query:
+        # Step 1: Hybrid Retrieval
+        yield format_ai_sdk_status_part(
+            stage="searching",
+            title="Concurrent Hybrid Retrieval (FTS + pgvector)",
+            message="Embedding query via Google gemini-embedding-001 (768-d). Executing parallel tsvector FTS & pgvector cosine similarity search (<=>) in ThreadPoolExecutor...",
+            technical_details={
+                "embedding_model": "Google gemini-embedding-001",
+                "vector_dim": 768,
+                "fts_parser": "websearch_to_tsquery + ts_rank_cd",
+                "concurrency": "ThreadPoolExecutor (2 workers)",
+                "filter_ticker": ticker or "All Filings",
+                "filter_fy": fiscal_year or "All Years",
+                "conversation_memory": f"{len(prior_messages)} prior turns" if prior_messages else "New Session",
+            },
+        )
 
-    # Step 2: RRF Fusion & Expansion
-    yield format_ai_sdk_status_part(
-        stage="fusion",
-        title="Reciprocal Rank Fusion & Neighbor Expansion",
-        message=f"Fused candidates via RRF (k=60). Expanded context window with ±1 neighbor chunks across {len(initial_passages)} top passages...",
-        technical_details={
-            "algorithm": "Reciprocal Rank Fusion (k=60)",
-            "top_passages": len(initial_passages),
-            "context_expansion": "±1 neighbor chunks",
-            "storage": "Supabase PostgreSQL (pgvector + tsvector)",
-        },
-    )
+        logger.info(
+            "Executing retrieval: query='%s', ticker=%s, fy=%s (history_turns=%d)",
+            retrieval_query,
+            ticker,
+            fiscal_year,
+            len(prior_messages),
+        )
+        initial_passages = retriever.retrieve(
+            query=retrieval_query,
+            ticker=ticker,
+            fiscal_year=fiscal_year,
+            top_n=5,
+            expand_neighbors=True,
+        )
+
+        # Step 2: RRF Fusion & Expansion
+        yield format_ai_sdk_status_part(
+            stage="fusion",
+            title="Reciprocal Rank Fusion & Neighbor Expansion",
+            message=f"Fused candidates via RRF (k=60). Expanded context window with ±1 neighbor chunks across {len(initial_passages)} top passages...",
+            technical_details={
+                "algorithm": "Reciprocal Rank Fusion (k=60)",
+                "top_passages": len(initial_passages),
+                "context_expansion": "±1 neighbor chunks",
+                "storage": "Supabase PostgreSQL (pgvector + tsvector)",
+            },
+        )
+
+        # Step 3: PydanticAI Reasoning
+        yield format_ai_sdk_status_part(
+            stage="reasoning",
+            title=f"PydanticAI Reasoning with {llm_display_label}",
+            message=f"Injecting verified context window into {llm_display_label} system prompt. Synthesizing disclosures and extracting financial metrics under Meridian Research compliance directives...",
+            technical_details={
+                "orchestrator": "PydanticAI v2.52.0",
+                "llm": target_primary_name,
+                "system_prompt": "Meridian Research Trust Directives",
+                "compliance": "Strict corpus grounding, no non-causal speculation",
+            },
+        )
+    else:
+        logger.info("Non-filing intent '%s'; proceeding with zero-retrieval context", intent)
+        initial_passages = []
+
+        if intent == "general_finance":
+            yield format_ai_sdk_status_part(
+                stage="reasoning",
+                title="Institutional Financial Synthesis",
+                message=f"Analyzing macroeconomic principles, financial history, and regulatory frameworks with {llm_display_label}...",
+                technical_details={
+                    "domain": "Institutional Financial Knowledge",
+                    "scope": "Financial History / Macro / Regulatory Policy",
+                    "llm": target_primary_name,
+                },
+            )
+        elif intent == "analyst_utility":
+            yield format_ai_sdk_status_part(
+                stage="reasoning",
+                title="Analyst Utility Suite",
+                message=f"Evaluating analytical formula / financial utility inquiry with {llm_display_label}...",
+                technical_details={
+                    "domain": "Analyst Productivity Suite",
+                    "utility": "Formulas / Math / Syntax",
+                    "llm": target_primary_name,
+                },
+            )
+        elif intent == "greeting_lifecycle":
+            yield format_ai_sdk_status_part(
+                stage="reasoning",
+                title="Meridian Research Session",
+                message="Preparing session response...",
+                technical_details={
+                    "mode": "Conversational Lifecycle",
+                    "coverage": "5 Issuers (FY21-FY25)",
+                    "llm": target_primary_name,
+                },
+            )
+        else:
+            yield format_ai_sdk_status_part(
+                stage="reasoning",
+                title="Compliance & Scope Verification",
+                message="Evaluating inquiry against institutional compliance boundaries...",
+                technical_details={
+                    "compliance": "Meridian Scope Directives",
+                    "intent": intent,
+                    "llm": target_primary_name,
+                },
+            )
 
     deps = DocumentAgentDeps(
         retriever=retriever,
         initial_passages=initial_passages,
         conversation_history=conversation_history_str,
     )
-
-    active_llm_name = model_name or "gemini-3-flash-preview"
-    target_primary_name = MODEL_ALIASES.get(active_llm_name, active_llm_name)
-    llm_display_label = MODEL_DISPLAY_NAMES.get(target_primary_name, target_primary_name)
-
-    # Step 3: PydanticAI Reasoning
-    yield format_ai_sdk_status_part(
-        stage="reasoning",
-        title=f"PydanticAI Reasoning with {llm_display_label}",
-        message=f"Injecting verified context window into {llm_display_label} system prompt. Synthesizing disclosures and extracting financial metrics under Meridian Research compliance directives...",
-        technical_details={
-            "orchestrator": "PydanticAI v2.52.0",
-            "llm": target_primary_name,
-            "system_prompt": "Meridian Research Trust Directives",
-            "compliance": "Strict corpus grounding, no non-causal speculation",
-        },
-    )
-
     # 3. Run PydanticAI Gemini agent with waterfall failover
     try:
         agent_result, actual_model_used = await _run_agent_with_failover(
@@ -684,17 +945,28 @@ async def stream_orchestrated_turn(
     saved_citations = save_citations(client, asst_msg_id, citation_payloads)
 
     # Step 5: Complete status
-    yield format_ai_sdk_status_part(
-        stage="complete",
-        title="Pipeline Verified & Streaming",
-        message=f"Grounding verified ({len(val_result.verified_citations)} citations confirmed). Streaming tokens...",
-        technical_details={
-            "verified_citations": len(val_result.verified_citations),
-            "status": "passed" if val_result.is_valid else "flagged",
-            "protocol": "Vercel AI SDK SSE Data Stream",
-        },
-    )
-
+    if is_filing_query:
+        yield format_ai_sdk_status_part(
+            stage="complete",
+            title="Pipeline Verified & Streaming",
+            message=f"Grounding verified ({len(val_result.verified_citations)} citations confirmed). Streaming tokens...",
+            technical_details={
+                "verified_citations": len(val_result.verified_citations),
+                "status": "passed" if val_result.is_valid else "flagged",
+                "protocol": "Vercel AI SDK SSE Data Stream",
+            },
+        )
+    else:
+        yield format_ai_sdk_status_part(
+            stage="complete",
+            title="Response Verified & Streaming",
+            message="Compliance and grounding verified. Streaming response tokens...",
+            technical_details={
+                "status": "passed" if val_result.is_valid else "flagged",
+                "citations": len(val_result.verified_citations),
+                "protocol": "Vercel AI SDK SSE Data Stream",
+            },
+        )
     # 7. Stream text response tokens
     words = final_answer_text.split(" ")
     for i, word in enumerate(words):

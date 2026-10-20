@@ -337,3 +337,213 @@ async def test_maybe_generate_thread_title_deferred_for_greetings() -> None:
         user_content="What were Google TAC expenses in 2024?",
     )
     assert title_res_locked is None
+
+
+# ===========================================================================
+# ROUTING, BROADENED FINANCE COVERAGE, & TICKER INHERITANCE TRANSITION TESTS
+# ===========================================================================
+
+def test_all_15_benchmark_queries_select_covered_filing_rag_route() -> None:
+    """Regression Gate: All 15 retrieval benchmark queries MUST strictly select the covered-filing RAG path."""
+    import sys
+    from pathlib import Path
+    from app.chat.orchestrator import _classify_query_intent
+
+    # Import BENCHMARK_QUERIES dynamically
+    scripts_path = Path(__file__).resolve().parents[2] / "scripts"
+    if str(scripts_path) not in sys.path:
+        sys.path.insert(0, str(scripts_path))
+    from run_eval_benchmark import BENCHMARK_QUERIES
+
+    assert len(BENCHMARK_QUERIES) == 15, "Expected 15 benchmark queries"
+
+    for eq in BENCHMARK_QUERIES:
+        intent = _classify_query_intent(eq.query, [])
+        assert intent == "sec_filing_rag", (
+            f"Benchmark query Q{eq.id} '{eq.query}' failed to select 'sec_filing_rag' route! Got: '{intent}'"
+        )
+
+
+def test_6_gate_query_classification_matrix() -> None:
+    """Verifies that the 6-gate routing classifier accurately partitions queries without regression."""
+    from app.chat.orchestrator import _classify_query_intent
+
+    prior_apple = [{"role": "user", "content": "What was Apple revenue in 2024?"}]
+
+    # Gate 1: Trading advice refusal
+    assert _classify_query_intent("Should I buy NVDA?", []) == "trading_advice_refusal"
+    assert _classify_query_intent("What is your price target for Apple stock?", []) == "trading_advice_refusal"
+
+    # Gate 2: Unindexed issuer boundary
+    assert _classify_query_intent("What was Tesla's FY2024 gross margin?", []) == "unindexed_issuer_refusal"
+    assert _classify_query_intent("Summarize Netflix's 10-K", []) == "unindexed_issuer_refusal"
+
+    # Gate 3: Covered issuer filing questions (explicit, comparative, and mixed)
+    assert _classify_query_intent("What was Apple's Services revenue in its FY2024 10-K?", []) == "sec_filing_rag"
+    assert _classify_query_intent("Compare Microsoft and Amazon's reported results", []) == "sec_filing_rag"
+    assert _classify_query_intent("How did inflation affect Microsoft's reported margins, and what is inflation?", []) == "sec_filing_rag"
+    assert _classify_query_intent("Services revenue?", []) == "sec_filing_rag"
+
+    # Gate 4: Analyst utilities & greetings
+    assert _classify_query_intent("How do I calculate XIRR in Excel?", []) == "analyst_utility"
+    assert _classify_query_intent("is it renaissance or rennaissance?", []) == "analyst_utility"
+    assert _classify_query_intent("convert 75 bps to percentage", []) == "analyst_utility"
+    assert _classify_query_intent("hi how are you", []) == "greeting_lifecycle"
+    assert _classify_query_intent("all good", []) == "greeting_lifecycle"
+    assert _classify_query_intent("bye", []) == "greeting_lifecycle"
+
+    # Gate 5: Substantive General Finance & Financial History
+    assert _classify_query_intent("What caused the 2008 financial crisis, and how did political decisions affect the response?", []) == "general_finance"
+    assert _classify_query_intent("Explain the Enron accounting scandal", []) == "general_finance"
+    assert _classify_query_intent("What caused the 1987 market crash?", []) == "general_finance"
+    assert _classify_query_intent("Explain Dodd-Frank Wall Street Reform Act", []) == "general_finance"
+    assert _classify_query_intent("What is capital budgeting?", []) == "general_finance"
+
+    # Ticker inheritance separation test:
+    # After an Apple conversation, filing follow-up inherits ticker, but general finance DOES NOT!
+    assert _classify_query_intent("How did that compare with 2023?", prior_apple) == "sec_filing_rag_inherited"
+    assert _classify_query_intent("What about their operating margins?", prior_apple) == "sec_filing_rag_inherited"
+    assert _classify_query_intent("What caused the 2008 financial crisis, and how did political decisions affect the response?", prior_apple) == "general_finance"
+    assert _classify_query_intent("Explain the Enron accounting scandal", prior_apple) == "general_finance"
+
+    # Gate 6: Genuinely out-of-domain
+    assert _classify_query_intent("Who was the first emperor of Rome?", []) == "out_of_domain_refusal"
+    assert _classify_query_intent("How do I bake chocolate chip cookies?", []) == "out_of_domain_refusal"
+
+
+@pytest.mark.anyio
+async def test_clean_transition_from_company_to_general_finance() -> None:
+    """Verifies that asking about the 2008 crisis after discussing Apple does NOT inherit AAPL ticker or pollute retrieval."""
+    thread_id = uuid.uuid4()
+
+    mock_client = MagicMock()
+    # Prior thread history: Turn 1 was about Apple (AAPL)
+    prev_user = {"role": "user", "content": "What was Apple revenue in 2024?"}
+    prev_asst = {"role": "assistant", "content": "Apple revenue was $391,035M [^1]."}
+    mock_client.table().select().eq().order().execute.return_value = MagicMock(
+        data=[prev_user, prev_asst]
+    )
+    mock_client.table().insert().execute.side_effect = [
+        MagicMock(data=[{"id": str(uuid.uuid4())}]),
+        MagicMock(data=[{"id": str(uuid.uuid4())}]),
+    ]
+
+    mock_retriever = MagicMock()
+
+    mock_agent = MagicMock()
+    crisis_answer = GroundedAnswer(
+        answer=(
+            "The **2008 Global Financial Crisis** was precipitated by the collapse of the U.S. subprime housing market, "
+            "widespread securitization of high-risk mortgages into Collateralized Debt Obligations (CDOs), and extreme leverage. "
+            "Political and regulatory decisions shaped the response through the Troubled Asset Relief Program (TARP), "
+            "emergency Federal Reserve liquidity facilities, and the subsequent passage of the Dodd-Frank Act."
+        ),
+        citations=[],
+        has_sufficient_evidence=True,
+        refusal_reason=None,
+    )
+    mock_agent_result = MagicMock()
+    mock_agent_result.output = crisis_answer
+    mock_agent.run = AsyncMock(return_value=mock_agent_result)
+
+    chunks = []
+    async for s in stream_orchestrated_turn(
+        client=mock_client,
+        thread_id=thread_id,
+        user_content="What caused the 2008 financial crisis, and how did political decisions affect the response?",
+        retriever=mock_retriever,
+        agent_override=mock_agent,
+    ):
+        chunks.append(s)
+
+    full_stream = "".join(chunks)
+
+    # 1. Retriever should NOT have been called with AAPL!
+    assert mock_retriever.retrieve.call_count == 0, "Retriever should not be called for general finance questions"
+
+    # 2. Status message should transparently state Institutional Financial Synthesis (not 10-K hybrid retrieval)
+    assert "Institutional Financial Synthesis" in full_stream
+    assert "Concurrent Hybrid Retrieval" not in full_stream
+
+    # 3. Stream should finish cleanly without citations event
+    assert '2:[{"type": "citations"' not in full_stream
+    assert 'd:{"finishReason": "stop"' in full_stream
+    assert '0:"Troubled ' in full_stream and '0:"(TARP)' in full_stream
+
+
+@pytest.mark.anyio
+async def test_stream_mixed_query_microsoft_and_inflation() -> None:
+    """Verifies that mixed inquiries (Microsoft margins + inflation concept) route to 10-K RAG, cite Microsoft disclosures, and explain inflation."""
+    thread_id = uuid.uuid4()
+    chunk_id = uuid.uuid4()
+    p = RetrievedPassage(
+        chunk_id=chunk_id,
+        document_id=uuid.uuid4(),
+        ticker="MSFT",
+        company_name="Microsoft Corporation",
+        fiscal_year=2024,
+        filing_type="10-K",
+        filing_date="2024-07-30",
+        chunk_index=1,
+        text="Operating income was $109,433 million for fiscal year 2024.",
+        full_context_text="Operating income was $109,433 million for fiscal year 2024.",
+        rrf_score=0.032,
+        citation_source="Microsoft Corporation (MSFT) FY2024 10-K [Item 7. MD&A]",
+    )
+
+    mock_client = MagicMock()
+    mock_client.table().select().eq().order().execute.return_value = MagicMock(data=[])
+    mock_client.table().insert().execute.side_effect = [
+        MagicMock(data=[{"id": str(uuid.uuid4())}]),
+        MagicMock(data=[{"id": str(uuid.uuid4())}]),
+        MagicMock(data=[{"id": str(uuid.uuid4()), "chunk_id": str(chunk_id)}]),
+    ]
+
+    mock_retriever = MagicMock()
+    mock_retriever.retrieve.return_value = [p]
+
+    mock_agent = MagicMock()
+    mixed_answer = GroundedAnswer(
+        answer=(
+            "In fiscal year 2024, Microsoft reported operating income of $109,433 million [^1], expanding operating margins. "
+            "Inflation is the macroeconomic rate at which the general level of prices for goods and services rises, eroding purchasing power."
+        ),
+        citations=[
+            CitationItem(
+                chunk_id=chunk_id,
+                citation_label="[^1]",
+                ticker="MSFT",
+                fiscal_year=2024,
+                snippet="$109,433 million",
+            )
+        ],
+        has_sufficient_evidence=True,
+    )
+    mock_agent_result = MagicMock()
+    mock_agent_result.output = mixed_answer
+    mock_agent.run = AsyncMock(return_value=mock_agent_result)
+
+    chunks = []
+    async for s in stream_orchestrated_turn(
+        client=mock_client,
+        thread_id=thread_id,
+        user_content="How did inflation affect Microsoft's reported margins, and what is inflation?",
+        retriever=mock_retriever,
+        agent_override=mock_agent,
+    ):
+        chunks.append(s)
+
+    full_stream = "".join(chunks)
+
+    # 1. Filing retrieval was triggered for MSFT
+    assert mock_retriever.retrieve.call_count == 1
+    call_kwargs = mock_retriever.retrieve.call_args.kwargs
+    assert call_kwargs["ticker"] == "MSFT"
+
+    # 2. Status message should show 4-Gate Grounding
+    assert "4-Gate Fail-Closed Grounding Verification" in full_stream
+
+    # 3. Verified citation for Microsoft should be streamed
+    assert '2:[{"type": "citations"' in full_stream
+    assert "MSFT" in full_stream
+    assert 'd:{"finishReason": "stop"' in full_stream
