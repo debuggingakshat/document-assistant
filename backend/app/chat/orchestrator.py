@@ -341,25 +341,48 @@ async def orchestrate_turn(
     )
 
 
+def _is_low_information_greeting(text: str) -> bool:
+    """Return True if text is a casual greeting, test, or low-information conversational opener."""
+    clean = re.sub(r"[^\w\s]", "", text.strip().lower())
+    words = clean.split()
+    if not words:
+        return True
+    greeting_words = {
+        "hi", "hello", "hey", "howdy", "greetings", "good", "morning", "afternoon", "evening",
+        "day", "there", "how", "are", "you", "doing", "yo", "sup", "whatsup", "test", "ok",
+        "okay", "bye", "goodbye", "thanks", "thank"
+    }
+    if len(words) <= 6 and all(w in greeting_words for w in words):
+        return True
+    return False
+
+
 async def maybe_generate_thread_title(
     client: Client,
     thread_id: uuid.UUID,
     user_content: str,
     model_name: str | None = None,
 ) -> str | None:
-    """Generate a crisp 3-5 word title for untitled threads using fast LLM summarization."""
+    """Generate a crisp 3-5 word title for untitled or greeting-titled threads using fast LLM summarization."""
     try:
         thread = get_thread(client, thread_id)
         if not thread:
             return None
 
-        current_title = thread.get("title")
-        if current_title and current_title.strip() not in (
-            "",
-            "Untitled Analysis",
-            "Untitled Thread",
-            "New Thread",
-        ):
+        current_title = (thread.get("title") or "").strip()
+        is_placeholder_or_greeting = (
+            not current_title
+            or current_title in ("", "Untitled Analysis", "Untitled Thread", "New Thread")
+            or _is_low_information_greeting(current_title)
+        )
+
+        if not is_placeholder_or_greeting:
+            return None
+
+        # Defer titling if the user prompt itself is just a casual greeting without financial topic.
+        # Leaves the thread as "Untitled Analysis" until the first substantive query arrives.
+        if _is_low_information_greeting(user_content):
+            logger.info("Deferred title generation for greeting query: '%s'", user_content)
             return None
 
         fallback_title = user_content.strip()[:40].strip()

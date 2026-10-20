@@ -108,7 +108,13 @@ export function useChatStream({ threadId }: UseChatStreamOptions) {
       // If in draft mode (no thread exists yet), create the thread on the fly!
       if (!targetThreadId) {
         try {
-          const generatedTitle = trimmed.length > 55 ? trimmed.slice(0, 55) + "..." : trimmed
+          const cleanWords = trimmed.toLowerCase().replace(/[^\w\s]/g, "").split(/\s+/).filter(Boolean)
+          const greetingWords = new Set(["hi", "hello", "hey", "howdy", "greetings", "good", "morning", "afternoon", "evening", "day", "there", "how", "are", "you", "doing", "yo", "sup", "whatsup", "test", "ok", "okay", "bye", "goodbye", "thanks", "thank"])
+          const isGreeting = cleanWords.length > 0 && cleanWords.length <= 6 && cleanWords.every((w) => greetingWords.has(w))
+
+          const generatedTitle = isGreeting
+            ? "Untitled Analysis"
+            : (trimmed.length > 55 ? trimmed.slice(0, 55) + "..." : trimmed)
           const newThread = await createThread(generatedTitle)
           targetThreadId = newThread.id
           setActiveThreadId(newThread.id)

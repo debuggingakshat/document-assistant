@@ -298,3 +298,42 @@ async def test_stream_non_financial_query_refusal() -> None:
     assert "psychology" in full_stream
     assert 'd:{"finishReason": "stop"' in full_stream
     assert '2:[{"type": "citations"' not in full_stream
+
+
+@pytest.mark.anyio
+async def test_maybe_generate_thread_title_deferred_for_greetings() -> None:
+    """Verifies that greetings defer titling, while real financial inquiries auto-name the thread."""
+    from app.chat.orchestrator import _is_low_information_greeting, maybe_generate_thread_title
+
+    # 1. Unit check for greeting detector
+    assert _is_low_information_greeting("hi") is True
+    assert _is_low_information_greeting("hi how are you") is True
+    assert _is_low_information_greeting("Hello there!") is True
+    assert _is_low_information_greeting("good morning") is True
+    assert _is_low_information_greeting("What was Microsoft Azure revenue in FY24?") is False
+    assert _is_low_information_greeting("is it renaissance or rennaissance?") is False
+
+    thread_id = uuid.uuid4()
+    mock_client = MagicMock()
+
+    # 2. When user sends "hi how are you" in an untitled thread -> deferred (returns None)
+    mock_client.table().select().eq().execute.return_value = MagicMock(
+        data=[{"id": str(thread_id), "title": "Untitled Analysis"}]
+    )
+    title_res = await maybe_generate_thread_title(
+        client=mock_client,
+        thread_id=thread_id,
+        user_content="hi how are you",
+    )
+    assert title_res is None
+
+    # 3. When thread already has a good title ("Apple iPhone Sales") -> returns None (does not overwrite)
+    mock_client.table().select().eq().execute.return_value = MagicMock(
+        data=[{"id": str(thread_id), "title": "Apple FY24 iPhone Sales"}]
+    )
+    title_res_locked = await maybe_generate_thread_title(
+        client=mock_client,
+        thread_id=thread_id,
+        user_content="What were Google TAC expenses in 2024?",
+    )
+    assert title_res_locked is None
