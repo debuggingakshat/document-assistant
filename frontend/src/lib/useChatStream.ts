@@ -104,38 +104,12 @@ export function useChatStream({ threadId }: UseChatStreamOptions) {
       const assistantMessageId = `assistant-${Date.now()}`
 
       let targetThreadId = activeThreadId || threadId
+      const placeholderThreadId = targetThreadId || `draft-${Date.now()}`
 
-      // If in draft mode (no thread exists yet), create the thread on the fly!
-      if (!targetThreadId) {
-        try {
-          const cleanWords = trimmed.toLowerCase().replace(/[^\w\s]/g, "").split(/\s+/).filter(Boolean)
-          const greetingWords = new Set(["hi", "hello", "hey", "howdy", "greetings", "good", "morning", "afternoon", "evening", "day", "there", "how", "are", "you", "doing", "yo", "sup", "whatsup", "test", "ok", "okay", "bye", "goodbye", "thanks", "thank", "all", "got", "it", "understood", "makes", "sense", "no", "that", "thats", "now", "fine", "great"])
-          const isGreeting = cleanWords.length > 0 && cleanWords.length <= 6 && cleanWords.every((w) => greetingWords.has(w))
-
-          const generatedTitle = isGreeting
-            ? "Untitled Analysis"
-            : (trimmed.length > 55 ? trimmed.slice(0, 55) + "..." : trimmed)
-          const newThread = await createThread(generatedTitle)
-          targetThreadId = newThread.id
-          setActiveThreadId(newThread.id)
-          justCreatedThreadIdRef.current = newThread.id
-
-          if (typeof window !== "undefined") {
-            window.dispatchEvent(
-              new CustomEvent("meridian_thread_created", { detail: newThread })
-            )
-            window.history.replaceState(null, "", `/chat/${newThread.id}`)
-          }
-        } catch (err) {
-          setError(err instanceof Error ? err.message : "Failed to initialize research thread")
-          setPipelineStatus(null)
-          return
-        }
-      }
-
+      // 1. OPTIMISTIC MOUNT (0ms UI latency): Immediately show user prompt & assistant thinking state
       const initialAssistantMsg: Message = {
         id: assistantMessageId,
-        thread_id: targetThreadId,
+        thread_id: placeholderThreadId,
         role: "assistant",
         content: "",
         created_at: new Date().toISOString(),
@@ -152,7 +126,7 @@ export function useChatStream({ threadId }: UseChatStreamOptions) {
       } else {
         const userMsg: Message = {
           id: userMessageId,
-          thread_id: targetThreadId,
+          thread_id: placeholderThreadId,
           role: "user",
           content: trimmed,
           created_at: new Date().toISOString(),
@@ -160,6 +134,45 @@ export function useChatStream({ threadId }: UseChatStreamOptions) {
         setMessages((prev) => [...prev, userMsg, initialAssistantMsg])
       }
       setIsStreaming(true)
+
+      // 2. If in draft mode (no thread exists yet), create the thread on the fly in the background!
+      if (!targetThreadId) {
+        try {
+          const cleanWords = trimmed.toLowerCase().replace(/[^\w\s]/g, "").split(/\s+/).filter(Boolean)
+          const greetingWords = new Set(["hi", "hello", "hey", "howdy", "greetings", "good", "morning", "afternoon", "evening", "day", "there", "how", "are", "you", "doing", "yo", "sup", "whatsup", "test", "ok", "okay", "bye", "goodbye", "thanks", "thank", "all", "got", "it", "understood", "makes", "sense", "no", "that", "thats", "now", "fine", "great"])
+          const isGreeting = cleanWords.length > 0 && cleanWords.length <= 6 && cleanWords.every((w) => greetingWords.has(w))
+
+          const generatedTitle = isGreeting
+            ? "Untitled Analysis"
+            : (trimmed.length > 55 ? trimmed.slice(0, 55) + "..." : trimmed)
+          const newThread = await createThread(generatedTitle)
+          targetThreadId = newThread.id
+          setActiveThreadId(newThread.id)
+          justCreatedThreadIdRef.current = newThread.id
+
+          // Re-link the optimistically mounted messages to the real thread ID
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.thread_id === placeholderThreadId ? { ...m, thread_id: newThread.id } : m
+            )
+          )
+
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(
+              new CustomEvent("meridian_thread_created", { detail: newThread })
+            )
+            window.history.replaceState(null, "", `/chat/${newThread.id}`)
+          }
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "Failed to initialize research thread")
+          setMessages((prev) =>
+            prev.filter((m) => m.id !== assistantMessageId && m.id !== userMessageId)
+          )
+          setPipelineStatus(null)
+          setIsStreaming(false)
+          return
+        }
+      }
 
       try {
         const token = await getAccessToken()
