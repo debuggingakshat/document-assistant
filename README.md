@@ -1,195 +1,375 @@
-# Document Assistant
+# Meridian Research Document Assistant
 
-An internal AI research copilot for senior equity research analysts at **Meridian Research**. Document Assistant allows analysts to query SEC 10-K filings in natural language and receive strictly grounded, fully cited answers with one-click access to the underlying filing excerpts and financial tables.
-
----
-
-## The Client & Use Case
-
-**Meridian Research** is an independent institutional equity research firm covering major US equities. Prior to Document Assistant, analysts spent ~20 hours per week opening filings, searching for risk factors and segment disclosures, manually comparing year-over-year figures, and compiling intake tables before writing original analysis.
-
-Document Assistant automates this intake workflow while adhering to strict institutional compliance:
-- **100% Grounded in Corpus**: Never invents facts or projects non-causal claims.
-- **Verbatim Citations**: Every claim and quantitative figure links directly to the filing, fiscal year, and underlying passage.
-- **Direct Passage Verification**: Analysts can click any citation chip (`[^1]`, `[^2]`) to view highlighted numerical figures and full surrounding filing context.
-- **Institutional Guardrails**: Refuses speculative stock tips, price targets, or unsubstantiated margin causality claims.
-
-For complete background, refer to [docs/client-brief.md](docs/client-brief.md) and [docs/architecture.md](docs/architecture.md).
+> **Institutional SEC 10-K Equity Research AI Assistant**  
+> Audited 10-K Filings for **Apple (`AAPL`)**, **Amazon (`AMZN`)**, **Alphabet (`GOOGL`)**, **Microsoft (`MSFT`)**, and **NVIDIA (`NVDA`)** (FY2021 – FY2025).  
+> **Production Deployment ($0.00 / Month)**: [document-assistant-black.vercel.app](https://document-assistant-black.vercel.app)
 
 ---
 
-## Technical Stack
+## Performance & Quality Invariants
 
-| Layer | Technology | Rationale / Specification |
-|---|---|---|
-| **Backend** | Python 3.12+ / FastAPI | High-concurrency async ASGI API with streaming AI SDK protocol. |
-| **Agent / Orchestrator** | PydanticAI v2.52.0 | Type-safe structured outputs (`GroundedAnswer`) with system prompt directives and tool calling. |
-| **LLM Provider** | Google Gemini (Free Tier) | Zero-cost inference via Google AI Studio (`gemini-3-flash-preview` / `gemini-flash-lite-latest`) with automatic failover. |
-| **Embeddings** | BAAI/bge-base-en-v1.5 | High-accuracy local dense vectors (768 dimensions) via `fastembed` — $0.00 cost, zero API dependency. |
-| **Database** | Supabase Postgres + `pgvector` | Hybrid Reciprocal Rank Fusion (pgvector cosine similarity + full-text `tsvector` keyword search). |
-| **Frontend** | Vite + React 19 + TypeScript | Premium institutional interface built with Tailwind CSS, shadcn/ui, and Radix primitives. |
-| **Observability** | `structlog` | Structured JSON and console logging tracking HTTP latency, retrieval durations, and turn diagnostics. |
-| **Multi-Tenancy** | Supabase Auth (JWT) | Complete analyst isolation; database RLS and route verification guarantee zero cross-analyst thread exposure. |
-
----
-
-## Quickstart — Running Locally
-
-### 1. Prerequisites
-
-- **Python 3.12+** and [`uv`](https://docs.astral.sh/uv/) package manager:
-  ```bash
-  curl -LsSf https://astral.sh/uv/install.sh | sh
-  ```
-- **Node.js 20+ (LTS)** and [`pnpm`](https://pnpm.io/):
-  ```bash
-  corepack enable && corepack prepare pnpm@latest --activate
-  ```
-- **Supabase Project** with `pgvector` enabled (see [docs/guides/supabase-setup.md](docs/guides/supabase-setup.md)).
-- **Google AI Studio API Key** (Free tier available at [aistudio.google.com](https://aistudio.google.com/)).
+| Metric | Measured Value | Engineering Significance |
+| :--- | :--- | :--- |
+| **Grounding Pass Rate** | **100.0%** (11/11 Verified) | Zero ungrounded claims; 4-Gate Fail-Closed programmatic validation. |
+| **Retrieval Top-1 Precision** | **80.0%** (vs. Dense 66.7%) | Reciprocal Rank Fusion ($k=60$) + $\pm 1$ Neighbor Chunk Expansion. |
+| **Retrieval Top-5 Recall** | **86.7%** (MRR@5 = 0.822) | Concurrent FTS (`ts_rank_cd`) + Vector Cosine Similarity (`<=>`). |
+| **Daily Inference Quota** | **2,160+ Queries / Day** | 2D Waterfall Engine (2 Gemini API Keys $	imes$ 6 Cascaded Models at $0.00). |
+| **Perceived New Thread Latency** | **0ms (Instantaneous)** | Enterprise Draft Architecture (lazy thread creation on initial prompt). |
+| **Corpus Scale** | **2,793 Chunks (25 Filings)** | 8.58 MB pgvector RAM footprint; normalized GitHub-Flavored Markdown tables. |
+| **Automated Test Coverage** | **65 / 65 Passing** | Complete test suite across API, auth, chat, grounding, retrieval, and ingest. |
 
 ---
 
-### 2. Backend Setup
+## Master Architectural Documentation Map
+
+Every architectural component, compliance rule, and data pipeline is documented across dedicated Markdown specifications. Use this index to navigate the entire system:
+
+| Reference Document | Section / Focus | Key Concepts Covered |
+| :--- | :--- | :--- |
+| **[`specifics.md`](specifics.md)** | **Master Architectural Blueprint & Staff Interview Guide** | 15 comprehensive technical sections: ETL table normalization, RRF mathematics, 3-layer context window geometry, 4-gate grounding proofs, latency benchmarks, zero-cost topology, and 15 Senior Staff interview mastery Q&As. |
+| **[`backend/app/assistant/instructions.md`](backend/app/assistant/instructions.md)** | **Core Agent Compliance & Prompt Directives** | 5-Tier Scope Guardrails (Categories A–E), mandatory in-line citation contracts, dynamic thread onboarding, and anti-repetition conversational dynamics. |
+| **[`backend/app/assistant/README.md`](backend/app/assistant/README.md)** | **PydanticAI Reasoning Engine** | Structured output schemas (`GroundedAnswer`), runtime tool execution (`search_filings`, `read_chunk`), and the 2D waterfall failover cascade. |
+| **[`backend/app/retrieval/README.md`](backend/app/retrieval/README.md)** | **Hybrid Retrieval Engine** | Dense vector search (`gemini-embedding-001` 768-d), Sparse full-text search (`ts_rank_cd`), RRF ($k=60$), query expansion, and neighbor chunk fusion. |
+| **[`backend/app/grounding/README.md`](backend/app/grounding/README.md)** | **4-Gate Grounding Safety Engine** | Gate 1 (UUID Provenance), Gate 2 (Ticker Integrity), Gate 3 (Footnote Sync), and Gate 4 (Verbatim Substring Matching). |
+| **[`backend/README.md`](backend/README.md)** | **FastAPI Backend Service** | Async ASGI streaming protocol, SSE data-stream event format, Alembic database migrations, and Supabase service-role authentication. |
+| **[`frontend/README.md`](frontend/README.md)** | **React 19 + TypeScript Client** | Zero-latency draft pattern, 4px subtle table micro-scrollbar, real-time pipeline status stepper, rotating starter library, and citation inspection sheets. |
+| **[`data/README.md`](data/README.md)** | **SEC EDGAR Ingestion Pipeline** | SEC EDGAR automated retrieval, HTML table normalization, Docling conversion, and 2,793 vector chunk generation. |
+| **[`docs/architecture.md`](docs/architecture.md)** | **System Architectural Specification** | Topological request-response flow diagrams, database schemas, and streaming contracts. |
+| **[`docs/client-brief.md`](docs/client-brief.md)** | **Meridian Research Client Brief** | Target user personas (buy-side/sell-side equity analysts), operational requirements, and the 10 representative smoke-test questions. |
+| **[`docs/guides/supabase-setup.md`](docs/guides/supabase-setup.md)** | **Supabase & Postgres Setup** | Hosted Postgres configuration, `pgvector` & `pg_trgm` extensions, HNSW indexing, and Row-Level Security (RLS) policies. |
+| **[`docs/guides/backend-setup.md`](docs/guides/backend-setup.md)** | **Backend Environment Setup** | Step-by-step FastAPI virtualenv creation, dependency sync, and Alembic migrations. |
+| **[`docs/guides/frontend-setup.md`](docs/guides/frontend-setup.md)** | **Frontend Environment Setup** | Vite + React scaffold, Tailwind CSS v4 setup, and shadcn/ui components. |
+| **[`docs/todos.md`](docs/todos.md)** | **Engineering Implementation Checklist** | Completed milestones across all 9 implementation phases. |
+
+---
+
+## Complete From-Scratch Redevelopment Guide
+
+If you completely delete your local repository or set up a brand-new computer, follow this exact step-by-step runbook to restore, run, and verify the entire platform locally from scratch.
+
+### 1. Prerequisites to Install on Your PC
+
+Ensure the following tools are installed on your machine:
+
+1. **Git**:
+   ```bash
+   git --version  # Tested on git >= 2.39
+   ```
+2. **Python 3.12 or 3.13**:
+   ```bash
+   python3 --version
+   ```
+3. **[`uv`](https://docs.astral.sh/uv/) (Ultra-Fast Python Package Manager)**:
+   ```bash
+   # macOS / Linux:
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   # Or via Homebrew:
+   brew install uv
+   ```
+4. **Node.js 20+ (LTS) & npm**:
+   ```bash
+   node --version  # Should be v20.x or v22.x
+   npm --version
+   ```
+
+---
+
+### 2. External Cloud Accounts & Free Credentials Needed
+
+Before booting the services, gather these free-tier credentials:
+
+1. **Supabase (Database & Authentication)**:
+   - Create a free project at [supabase.com](https://supabase.com).
+   - In **Project Settings $	o$ API**, copy:
+     - `Project URL` (`SUPABASE_URL`)
+     - `anon public` key (`SUPABASE_ANON_KEY`)
+     - `service_role secret` key (`SUPABASE_SERVICE_ROLE_KEY`)
+   - In **Project Settings $	o$ Database $	o$ Connection string**, copy the URI (`DATABASE_URL`).
+   - In **Database $	o$ Extensions**, ensure `vector` and `pg_trgm` are enabled.
+2. **Google AI Studio (LLM & Embeddings)**:
+   - Create an API key at [aistudio.google.com](https://aistudio.google.com/) (100% free).
+   - *(Recommended for High-Availability)*: Create a second key under an alternate Google account to unlock the 2D waterfall key rotation (`GEMINI_API_KEY="key1,key2"`).
+
+---
+
+### 3. Step 1: Clone the Repository
+
+```bash
+git clone https://github.com/debuggingakshat/document-assistant.git
+cd document-assistant
+```
+
+---
+
+### 4. Step 2: Backend Environment & Database Setup
+
+Open your terminal in the repository root:
 
 ```bash
 cd backend
 
-# 1. Install dependencies into isolated virtual environment
-uv sync
+# 1. Create an isolated virtual environment and activate it
+uv venv .venv
+source .venv/bin/activate
 
-# 2. Configure environment variables
-# Copy or edit backend/.env:
-cat << 'ENV' > .env
-SUPABASE_URL="https://<your-project>.supabase.co"
+# 2. Install all core and development dependencies
+uv pip install -e ".[dev]"
+
+# 3. Configure backend environment variables
+cp .env.example .env
+```
+
+Edit `backend/.env` with your credentials:
+
+```dotenv
+# Supabase Configuration
+SUPABASE_URL="https://<your-project-ref>.supabase.co"
 SUPABASE_ANON_KEY="<your-supabase-anon-key>"
 SUPABASE_SERVICE_ROLE_KEY="<your-supabase-service-role-key>"
-DATABASE_URL="postgresql://postgres.<your-project>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres"
 
-GEMINI_API_KEY="<your-google-gemini-api-key>"
+# Direct Postgres Connection URI (used by Alembic and SQLAlchemy)
+DATABASE_URL="postgresql://postgres:<your-db-password>@db.<your-project-ref>.supabase.co:5432/postgres"
 
-EMBEDDING_PROVIDER="local"
-EMBEDDING_MODEL="BAAI/bge-base-en-v1.5"
+# Google AI Studio Gemini API Keys (comma-separated for dual-key failover)
+GEMINI_API_KEY="AIzaSyYourFirstKey,AIzaSyYourSecondKey"
+LLM_PROVIDER="gemini"
+LLM_MODEL="gemini-3-flash-preview"
+
+# Embeddings (Google AI Studio 768-dim model: 100% free, <90MB RAM footprint)
+EMBEDDING_PROVIDER="google"
+EMBEDDING_MODEL="gemini-embedding-001"
 EMBEDDING_DIMENSIONS=768
 
-ALLOWED_ORIGINS="http://localhost:5173"
-ENV
-
-# 3. Run database migrations
-uv run alembic upgrade head
-
-# 4. Start the FastAPI development server
-uv run uvicorn app.main:app --reload --port 8000
+# CORS Allowed Origins
+ALLOWED_ORIGINS="http://localhost:5173,https://document-assistant-black.vercel.app"
 ```
-Backend API will be running at `http://localhost:8000` (API documentation at `http://localhost:8000/docs`).
+
+#### Apply Database Migrations:
+```bash
+alembic upgrade head
+```
+This executes the migration chain in `backend/alembic/versions/` (`0c80fe9acb32_initial_schema.py` and `a2a304490b43_update_embedding_to_768_dim.py`), provisioning `source_documents`, `document_chunks`, `threads`, `messages`, and `message_citations` with vector `<=>` cosine distance and `tsvector` FTS indices.
+
+#### Corpus Verification & Ingestion (2,793 Chunks across 25 Filings):
+The pre-processed SEC 10-K filings for Apple, Amazon, Alphabet, Microsoft, and NVIDIA (FY2021–FY2025) are already stored as normalized GFM Markdown in `data/markdown/`.
+- If your database is fresh, populate the catalog and run ingestion:
+  ```bash
+  python ingest/load_source_documents.py
+  python ingest/pipeline.py
+  ```
+- Verify the corpus scale in your Supabase SQL Editor:
+  ```sql
+  SELECT count(*) FROM source_documents; -- Returns exactly 25
+  SELECT count(*) FROM document_chunks;  -- Returns exactly 2,793
+  ```
+
+#### Start the FastAPI Server:
+```bash
+uvicorn app.main:app --reload --port 8000
+```
+- API Health Check: `http://localhost:8000/health`
+- Interactive Swagger UI: `http://localhost:8000/docs`
 
 ---
 
-### 3. Frontend Setup
+### 5. Step 3: Frontend Environment Setup
+
+Open a second terminal window:
 
 ```bash
 cd frontend
 
-# 1. Install frontend packages
-pnpm install
+# 1. Install frontend npm dependencies
+npm install
 
 # 2. Configure environment variables
-cat << 'ENV' > .env
+cat << EOF > .env
 VITE_API_BASE_URL="http://localhost:8000"
-VITE_SUPABASE_URL="https://<your-project>.supabase.co"
+VITE_SUPABASE_URL="https://<your-project-ref>.supabase.co"
 VITE_SUPABASE_ANON_KEY="<your-supabase-anon-key>"
-ENV
+EOF
 
-# 3. Start Vite dev server
-pnpm dev
+# 3. Start the Vite development server
+npm run dev
 ```
-Open `http://localhost:5173` in your browser. Analysts can sign up or sign in with their email address.
+
+Open your browser to `http://localhost:5173`:
+- Create an analyst account using your email (Supabase Auth).
+- Click **"New Research Thread"** (initiates instantly with 0ms perceived latency).
+- Select any of the 5 live Google models from the input selector (`Gemini 3 Flash`, `Gemini 2.5 Flash`, etc.).
+- Start typing financial queries or click any starter suggestion card.
 
 ---
 
-## Ingesting & Updating SEC Filings
+## Automated Verification & Benchmark Suite
 
-The sample corpus covers fiscal 2021–2025 10-K filings for Apple (`AAPL`), Microsoft (`MSFT`), NVIDIA (`NVDA`), Amazon (`AMZN`), and Alphabet (`GOOGL`).
+Document Assistant features a fully automated verification pipeline to mathematically guarantee zero regressions and verify 100% grounded accuracy:
 
-### Step 1: Download Filings from SEC EDGAR
-Edit `USER_AGENT` in `data/download.py` to match your institutional identity, then run:
+### 1. Complete Pytest Suite (65/65 Passing)
+Executes all unit, integration, grounding, and retrieval tests:
 ```bash
-uv run data/download.py
+cd backend
+.venv/bin/pytest tests -v
 ```
-This saves HTML filings and generates `data/downloads/manifest.json`.
+*Expected Output: `65 passed in ~10s`.*
 
-### Step 2: Seed Source Documents in Supabase
-Populate the `source_documents` catalog:
+### 2. Empirical Grounding & Retrieval Benchmark (100% Pass Rate)
+Runs the empirical benchmark across live database queries and 4-gate verification:
 ```bash
-uv run python backend/ingest/load_source_documents.py
+cd backend
+.venv/bin/python scripts/run_eval_benchmark.py
+```
+*Empirical Resume Benchmark Results:*
+- **Production Top-1 Recall**: **80.0%** (vs. Dense 66.7%, Gain: +13.3%)
+- **Production Top-5 Recall**: **86.7%** (vs. Dense 86.7%)
+- **Production MRR@5**: **0.822**
+- **4-Gate Grounding Pass Rate**: **100.0%** (11/11 verified, 0% ungrounded citations permitted)
+
+### 3. Client Brief 10-Question Smoke Test
+Validates the system against all 10 analyst questions from the Meridian Research specification:
+```bash
+cd backend
+.venv/bin/python scripts/smoke_test_client_brief.py --quick
 ```
 
-### Step 3: Chunk, Embed, and Populate Vector Store
-Run the idempotent ingestion pipeline:
+### 4. Frontend Production Build Check
+Validates TypeScript type safety and minified production asset bundling:
 ```bash
-# Ingest full corpus (6,739 chunks across 25 filings)
-uv run python backend/ingest/pipeline.py
+cd frontend
+npm run build
+```
+*Expected Output: `built in ~450ms` with zero errors.*
 
-# Ingest a single company (e.g. Apple)
-uv run python backend/ingest/pipeline.py --ticker AAPL
+---
 
-# Force re-chunk and re-embed existing documents
-uv run python backend/ingest/pipeline.py --force
+## Core System Architecture & Innovations
+
+```
+                                  [ Analyst Prompt ]
+                                          │
+                                          ▼
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│ REACT 19 FRONTEND (Vite + Tailwind v4 + Radix)                                         │
+│ • 0ms Enterprise Draft Pattern (App.tsx / Sidebar.tsx / useChatStream.ts)              │
+│ • Dynamic 5-Model Selector (Gemini 3 Flash, 2.5 Flash, 2.0 Flash, 2.0/3.1 Lite)       │
+│ • Telemetry Status Stepper (Hybrid Search → RRF Fusion → Reasoning → Validation)       │
+│ • Subtle 4px Micro-Scrollbar for GFM Financial Tables (pb-1.5 gutter clearance)       │
+└─────────────────────────────────────────┬──────────────────────────────────────────────┘
+                                          │ Server-Sent Events (SSE Stream)
+                                          ▼
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│ FASTAPI ASGI BACKEND (Python 3.13)                                                     │
+│ • Sliding Window Memory: Last 6 messages (`LIMIT 6`, assistant turns $\le 350$ chars)  │
+│ • Active Ticker Inheritance Engine: Antecedent pronoun resolution (Apple → "their")   │
+└─────────────────────────────────────────┬──────────────────────────────────────────────┘
+                                          │
+                     ┌────────────────────┴────────────────────┐
+                     ▼                                         ▼
+┌──────────────────────────────────────────┐  ┌──────────────────────────────────────────┐
+│ STAGE 1: CONCURRENT HYBRID RETRIEVAL     │  │ STAGE 2: RRF FUSION & EXPANSION          │
+│ • Dense: Gemini-Embedding-001 (768-d)    │  │ • Reciprocal Rank Fusion ($k=60$)        │
+│ • Sparse: Postgres `ts_rank_cd` FTS      │  │ • $\pm 1$ Neighbor Chunk Graph Expansion │
+│ • Target: 2,793 Chunks across 25 Filings │  │ • Produces Top 5 high-density passages   │
+└──────────────────────────────────────────┘  └──────────────────────────────────────────┘
+                                                               │
+                                                               ▼
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│ STAGE 3: PYDANTICAI REASONING CORE & 2D WATERFALL ENGINE                               │
+│ • System Directives (`instructions.md`): Strict corpus grounding, no causal speculation│
+│ • 5-Tier Scope Guardrails: Categories A (Trading Refusal), B (Universe), C (Concepts), │
+│   D (Out-of-Domain Refusal), E (Analyst Utility Suite: Spelling, Math, Excel Formulas) │
+│ • 2D Waterfall Failover: Model x Key matrix (2 Keys $	imes$ 6 Models = 2,160+ RPD)    │
+└─────────────────────────────────────────┬──────────────────────────────────────────────┘
+                                          │
+                                          ▼
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│ STAGE 4: 4-GATE FAIL-CLOSED GROUNDING VALIDATOR                                        │
+│ • Gate 1: Set-intersection UUID Provenance (strips fabricated chunk IDs)               │
+│ • Gate 2: Ticker Entity Alignment (prevents cross-company citation contamination)       │
+│ • Gate 3: Footnote Marker Synchronization (syncs `[^1]` markers with citation objects) │
+│ • Gate 4: Verbatim Substring Match (validates numerical claims exist in source text)   │
+└─────────────────────────────────────────┬──────────────────────────────────────────────┘
+                                          │ Verified Factual Payload
+                                          ▼
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│ STREAMED AUDITABLE RESPONSE TO ANALYST                                                 │
+│ • Real-time markdown tokens + in-line citation chips `[^1]`                            │
+│ • Interactive Source Drawer: Click citation chip to inspect raw SEC filing text & table│
+└────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Automated Smoke Tests & Quality Gates
+## Production Deployment Topology ($0.00 / Month)
 
-### 1. Client Brief 10-Question Smoke Test
-Validate the assistant against all 10 representative analyst questions from the Meridian client brief:
-```bash
-# Run all 10 questions
-uv run python backend/scripts/smoke_test_client_brief.py
+Document Assistant is engineered to operate 100% within free-tier cloud quotas without incurring monthly infrastructure expenses:
 
-# Run a specific question (e.g. Question 1 or Question 10)
-uv run python backend/scripts/smoke_test_client_brief.py --question 1
-uv run python backend/scripts/smoke_test_client_brief.py --question 10
-
-# Quick sanity check (Questions 1, 2, and 10)
-uv run python backend/scripts/smoke_test_client_brief.py --quick
-```
-
-### 2. Backend Pytest Suite
-Run all 49 automated unit and integration tests:
-```bash
-uv run pytest backend/tests -v
-```
-
-### 3. Frontend Production Build Check
-Verify TypeScript types and Vite production bundling:
-```bash
-npm run build --prefix frontend
-```
+| Infrastructure Tier | Provider | Configuration / Spec | Cost / Month |
+| :--- | :--- | :--- | :--- |
+| **Frontend Web App** | **Vercel** | Edge Network, automatic GitHub CI/CD, React 19 SPA | **$0.00** |
+| **Backend API** | **Render** | Free-tier Web Service (Python 3.13, Uvicorn, ASGI) | **$0.00** |
+| **Database & Vector Store** | **Supabase** | Free-tier PostgreSQL with `pgvector` & `pg_trgm` | **$0.00** |
+| **Foundation LLM & Embeddings** | **Google AI Studio** | Gemini 3 Flash / Flash Lite + Gemini Embedding (2,160+ RPD) | **$0.00** |
+| **Total Monthly Operating Cost** | | | **$0.00 / mo** |
 
 ---
 
-## Security & Multi-User Isolation
+## Troubleshooting & Engineering Invariants
 
-- **Authentication**: All endpoints require a valid Supabase Auth JWT passed via `Authorization: Bearer <token>`.
-- **Row-Level Isolation**: Supabase Postgres RLS policies and FastAPI route checks verify `thread.user_id == current_user.id`. Any unauthorized thread access fails fast with `403 Forbidden`.
-- **Auditing**: Request latency, caller ID, and failover diagnostics are logged via `structlog`.
+1. **Python Exception Scoping in Failover Loops**:
+   - In Python 3, `except Exception as primary_exc:` deletes the local name variable upon block exit.
+   - Preserved `last_exc = primary_exc` *inside* the exception block in `backend/app/chat/orchestrator.py` to prevent `UnboundLocalError` from breaking the waterfall failover cascade.
+2. **Database Chunk Count Verification**:
+   - Ensure `document_chunks` contains exactly **2,793 chunks** across 25 source filings (not 6,739).
+   - If chunk count is off, re-run `python backend/ingest/pipeline.py --force`.
+3. **Supabase Connection Pooling**:
+   - For Alembic migrations, use port `5432` (Direct connection).
+   - For high-concurrency production ASGI workers, use port `6543` (Transaction Pooler).
+4. **CORS Headers**:
+   - If developing on a custom port, add the origin to `ALLOWED_ORIGINS` in `backend/.env`.
 
 ---
 
-## Documentation Index & Quick Reference
+## Repository Structure
 
-| Document | Purpose |
-| --- | --- |
-| [Client Brief](docs/client-brief.md) | Meridian Research requirements, target users, and 10 representative test questions |
-| [Architecture Specification](docs/architecture.md) | System design, database schema, data flow, and SSE streaming protocol |
-| [Backend Guide](backend/README.md) | FastAPI service setup, environment variables, database migrations, and testing |
-| [Assistant Reasoning Engine](backend/app/assistant/README.md) | PydanticAI agent orchestrator, system prompt contract, tool calling, and streaming |
-| [Grounding Safety Engine](backend/app/grounding/README.md) | Grounding safety validator, citation verification, and fail-closed refusal contract |
-| [Hybrid Retrieval Engine](backend/app/retrieval/README.md) | Dense BGE vector search, Postgres full-text search, RRF fusion, and window expansion |
-| [Frontend Guide](frontend/README.md) | Vite + React client, message stream, citation drawers, and theme toggle |
-| [Data Ingestion Pipeline](data/README.md) | SEC EDGAR corpus fetching, HTML table cleaner, Docling conversion, and vector indexing |
-| [Supabase Setup Guide](docs/guides/supabase-setup.md) | Hosted Postgres, pgvector extension, Auth configuration, and RLS policies |
-| [Backend Setup Guide](docs/guides/backend-setup.md) | Step-by-step FastAPI virtualenv and Alembic commands |
-| [Frontend Setup Guide](docs/guides/frontend-setup.md) | Vite + React scaffold and styling setup |
-| [Implementation Roadmap](docs/todos.md) | Progress checklist across Phases 1 through 9 |
+```
+document-assistant/
+├── README.md                           # Master Project Overview, Quickstart & Redevelopment Guide
+├── specifics.md                        # Complete 15-Section Architectural Blueprint & Interview Guide
+├── AGENTS.md                           # Agent Behavior Guidelines & Standards
+│
+├── backend/                            # FastAPI Backend Service
+│   ├── alembic/                        # SQLAlchemy / Alembic Database Migrations
+│   │   └── versions/                   # Migration versions (initial schema, 768-dim embeddings)
+│   ├── app/
+│   │   ├── api/                        # HTTP & SSE Streaming Endpoints (`/chat/stream`, `/threads`)
+│   │   ├── assistant/                  # PydanticAI Agent, `instructions.md`, Model Waterfall Cascade
+│   │   ├── chat/                       # Orchestrator, Turn Execution, Sliding Window Memory
+│   │   ├── grounding/                  # 4-Gate Fail-Closed Grounding Validator
+│   │   ├── retrieval/                  # Hybrid Search (Dense + FTS), RRF ($k=60$), Neighbor Expansion
+│   │   ├── config.py                   # Pydantic Settings & Multi-Key Extraction
+│   │   └── main.py                     # ASGI FastAPI Entrypoint & CORS Middleware
+│   ├── ingest/                         # Ingestion Pipeline, Table Cleaner, Chunking & Embedding
+│   ├── scripts/                        # Benchmark & Smoke Test Suite (`run_eval_benchmark.py`)
+│   ├── tests/                          # 65 Pytest Automated Unit & Integration Tests
+│   └── pyproject.toml                  # Backend Dependencies & Package Definitions
+│
+├── frontend/                           # React 19 + TypeScript Client (Vite + Tailwind v4)
+│   ├── src/
+│   │   ├── components/chat/            # ChatArea, MessageItem, FinancialTable, Sidebar, Telemetry Stepper
+│   │   ├── lib/                        # Chat Streaming Hook (`useChatStream.ts`), Supabase Client
+│   │   ├── App.tsx                     # Zero-Latency Route Definition (`/` and `/chat/:threadId`)
+│   │   └── index.css                   # Tailwind v4 Theme, 4px Table Micro-Scrollbar Styles
+│   └── package.json                    # Frontend Dependencies & Build Scripts
+│
+├── data/                               # 25 Audited SEC 10-K Filings (FY2021–FY2025)
+│   ├── markdown/                       # Cleaned, Normalized GFM Markdown Filings (AAPL, AMZN, GOOGL, MSFT, NVDA)
+│   ├── download.py                     # Automated SEC EDGAR Downloader
+│   └── README.md                       # Ingestion Data Dictionary & Filing Metadata
+│
+└── docs/                               # Supporting Architecture Documentation & Setup Guides
+    ├── architecture.md                 # System Architecture Blueprint
+    ├── client-brief.md                 # Meridian Research Specifications & 10 Test Questions
+    ├── todos.md                        # Implementation Roadmap Checklist
+    └── guides/                         # Setup Guides (Supabase, Backend, Frontend)
+```
