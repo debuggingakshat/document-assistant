@@ -11,6 +11,7 @@ STUDY PATHWAY (RECOMMENDED SEQUENCE):
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
 │ MODULE I: FOUNDATIONS & TOPOLOGY (SECTIONS 1–2)                                        │
 │   ├─► Section 1: Executive Summary & Mission Overview (The Business & Technical Mandate)│
+│   ├─► Section 1.5: Plain-English Concept Glossary & Intuition Bridge (From Scratch)    │
 │   └─► Section 2: End-to-End System Architecture & Topological Flow (10-Step Lifecycle) │
 ├────────────────────────────────────────────────────────────────────────────────────────┤
 │ MODULE II: INGESTION & HYBRID RETRIEVAL ENGINEERING (SECTIONS 3–5)                     │
@@ -38,6 +39,7 @@ STUDY PATHWAY (RECOMMENDED SEQUENCE):
 ### Table of Contents
 
 1. [1. Executive Summary & Mission Overview](#1-executive-summary--mission-overview) — *The business friction of equity research intake, zero-hallucination mandate, and foundational engineering principles.*
+1.5. [1.5 Plain-English Concept Glossary & Intuition Bridge (From Scratch to Mastery)](#15-the-foundation-plain-english-concept-glossary--intuition-bridge-from-scratch-to-mastery) — *Dumbing down every technical term: HNSW, vectors, cosine distance, ts_rank_cd, RRF, sliding windows, and fail-closed gates with real-world analogies.*
 2. [2. End-to-End System Architecture & Topological Flow](#2-end-to-end-system-architecture--topological-flow) — *Full-stack component diagram and the complete 10-step request-response lifecycle from browser to PostgreSQL.*
 3. [3. Data Ingestion & Preprocessing Pipeline (ETL)](#3-data-ingestion--preprocessing-pipeline-etl) — *Parsing 25 SEC 10-K filings, HTML table flattening, GFM header preservation across splits, and 2,793-chunk indexing.*
 4. [4. Hybrid Retrieval Architecture & Rank Aggregation (RAG)](#4-hybrid-retrieval-architecture--rank-aggregation-rag) — *Why dense vector search and sparse lexical search fail independently, RRF mathematical derivation ($k=60$), and neighbor expansion.*
@@ -82,7 +84,225 @@ Document Assistant solves this intake bottleneck by transforming static SEC EDGA
 4. **High-Availability 2D Waterfall Failover (2,160+ Free Daily Headroom)**: A dual-key and 5-model failover matrix guaranteeing zero user-facing errors or demand warnings. On quota exhaustion, the engine rotates API keys for the selected model first, cascading to fallback models only when both keys are exhausted, scaling free-tier capacity to 2,160+ requests/day at $0.00.
 
 > [!NOTE]
-> **Section Transition (Flow to Section 2)**: Having established the business problem and core engineering commandments, Section 2 illustrates how these components interconnect in the end-to-end topological architecture.
+> **Section Transition (Flow to Section 1.5)**: Before analyzing the complex system topology, Section 1.5 breaks down every single foundational term, mathematical concept, and database index in plain English so that any engineer or interviewer can understand the project from the ground up.
+
+---
+
+## 1.5 The Foundation: Plain-English Concept Glossary & Intuition Bridge (From Scratch to Mastery)
+
+If you are learning Retrieval-Augmented Generation (RAG), vector databases, and enterprise AI engineering for the first time, the sheer volume of acronyms (HNSW, RRF, GIN, `tsvector`, Cosine `<=>`, PydanticAI) can feel overwhelming.
+
+This section is your **conceptual decoder ring**. Every core concept is broken down into four practical parts:
+1. **What is it?** (Its technical identity: is it an algorithm, an index, a database feature, or an architectural pattern?)
+2. **Plain-English Definition & Real-World Analogy** (How to explain it to someone with zero AI background).
+3. **Why Document Assistant Uses It** (The exact financial engineering justification).
+4. **The 30-Second Interview Answer** (Exactly what to say out loud to an interviewer to sound senior, knowledgeable, and articulate).
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                   THE CORE CONCEPT MAP AT A GLANCE                              │
+├───────────────────────┬─────────────────────────────┬───────────────────────────────────────────┤
+│ Concept / Acronym     │ Technical Identity          │ Everyday Real-World Analogy               │
+├───────────────────────┼─────────────────────────────┼───────────────────────────────────────────┤
+│ RAG                   │ Architectural Design Pattern│ Open-Book Exam (looking up facts in book) │
+│ Vector Embedding      │ 768-dimensional Float Array │ GPS Coordinates for Ideas and Meanings    │
+│ Cosine Distance (<=>) │ Mathematical Metric Function│ Direction of Flashlight Beam (ignores len)│
+│ HNSW                  │ Graph-Based Index Algorithm │ Multi-Layer Highway Network / Skip-List   │
+│ Sparse Retrieval      │ Inverted Index Lexical Match│ Exact Ctrl+F Keyword Search               │
+│ tsvector & GIN        │ PostgreSQL Native FTS Index │ Chemistry Textbook Index at back of book  │
+│ ts_rank_cd            │ Cover Density Formula       │ Rewarding words grouped close together    │
+│ RRF (k=60)            │ Unsupervised Rank Combiner  │ Two Olympic Judges combining scorecards   │
+│ Neighbor Expansion    │ Graph Foreign Key Traversal │ Zooming out camera lens to see whole table│
+│ Sliding Window (6 msg)│ Bounded Session Memory      │ Natural conversation short-term memory    │
+│ PydanticAI            │ Typed Agent Schema Validator│ Strict Government Tax Form (no free text) │
+│ 4-Gate Grounding      │ Post-Processing Gatekeeper  │ 4 Airport Security Metal Detectors        │
+│ 2D Waterfall Failover │ Resilient Quota Matrix      │ Dual-Fuel Backup Generator (Keys & Models)│
+│ Server-Sent Events    │ One-Way HTTP Stream Protocol│ Live TV News Ticker streaming text tokens │
+│ 0ms Optimistic Mount  │ Client-Side State Pattern   │ Seating customer & water glass instantly  │
+│ MRR & Top-1 Precision │ Information Retrieval Metric│ Search Engine Report Card (% at #1 spot)  │
+└───────────────────────┴─────────────────────────────┴───────────────────────────────────────────┘
+```
+
+---
+
+### Concept 1: RAG (Retrieval-Augmented Generation)
+- **Technical Identity**: Architectural Design Pattern.
+- **Plain-English Meaning**: An architecture where the AI is strictly forbidden from answering financial questions from its pre-trained memory. Instead, it first searches a private, audited database of SEC 10-K filings to find the exact pages (**Retrieval**), attaches those pages to the user's prompt (**Augmentation**), and instructs the model to synthesize the final answer strictly using those source pages (**Generation**).
+- **Everyday Analogy**: An **Open-Book Exam**. If you ask a student to guess Apple's 2021 Services Gross Margin from memory (Closed-Book), they will likely guess a number that sounds plausible but is completely wrong. If you instead hand them Apple's official 2021 10-K filing opened to page 34 and say *"Only answer using this table"* (Open-Book RAG), they will read the exact number with 100% accuracy.
+- **Why Document Assistant Uses It**: In institutional finance, a single hallucinated digit in a discounted cash flow (DCF) model can cost millions of dollars. RAG eliminates memory hallucinations by forcing the model to cite audited SEC filings.
+- **Interview Talking Point**: *"We use RAG to decouple static parametric memory from verified knowledge retrieval. The LLM acts purely as an analytical reasoning and synthesis engine over dynamically retrieved, audited SEC 10-K passages."*
+
+---
+
+### Concept 2: Vector & Vector Embedding (768 Dimensions)
+- **Technical Identity**: High-Dimensional Mathematical Representation (Array of 768 Float32 numbers).
+- **Plain-English Meaning**: A vector is a list of 768 decimal numbers (e.g., `[0.0142, -0.0512, 0.0891, ...]`) generated by an embedding model (`gemini-embedding-001`). It maps the **conceptual meaning** of a sentence into a 768-dimensional mathematical space. Sentences that mean the same thing are placed right next to each other, even if they use completely different words.
+- **Everyday Analogy**: **GPS Coordinates for Meaning**. In the physical world, your house has GPS coordinates `(Latitude, Longitude)`. If two houses are in the same neighborhood, their GPS numbers are almost identical. In 768-dimensional "thought space", the sentence *"Apple's money spent on factories and machines"* and the sentence *"Purchases of property, plant, and equipment"* receive almost identical 768-dimensional coordinates because they share the exact same financial concept.
+- **Why Document Assistant Uses It**: Financial analysts often use colloquial questions (*"How much did Google spend on server infrastructure?"*). The SEC filing uses formal accounting language (*"Capital expenditures related to technical infrastructure"*). Embeddings bridge this language gap by matching meaning rather than exact keywords.
+- **Interview Talking Point**: *"Embeddings project natural language onto a continuous 768-dimensional latent semantic manifold where conceptual proximity is measured geometrically via cosine distance."*
+
+---
+
+### Concept 3: Cosine Distance (`<=>`) vs. Euclidean Distance (`<->`)
+- **Technical Identity**: Distance Metric & Mathematical Objective Function.
+- **Full Form / SQL Operator**: $\text{Cosine Distance} = 1 - \cos(\theta)$. In PostgreSQL `pgvector`, it is written using the custom operator `<=>`.
+- **Plain-English Meaning**: A formula that measures the **angle** between two vector arrows in space, completely ignoring how long the arrows are.
+- **Everyday Analogy**: **Two Flashlights Pointing North**. Imagine two people in a dark field. Person A has a small pocket penlight (representing a short 3-word user query: *"Apple iPhone revenue"*). Person B has a giant military searchlight (representing a 500-word paragraph from an SEC 10-K filing). Both people point their flashlights due North. 
+  - If you measure the **angle** between the two beams, it is $0^\circ$ (they point in the exact same direction!). That is **Cosine Distance**.
+  - If you measure the physical distance between the tips of the two light beams, they are hundreds of feet apart because one beam is short and one is long. That is **Euclidean Distance** ($L_2$).
+- **Why Document Assistant Uses Cosine Distance**: In SEC filings, a user query is typically 5 to 10 words, while an ingested document chunk is 400 to 800 words. Euclidean distance mistakenly treats them as "far apart" simply because of document length. Cosine distance normalizes the length, focusing purely on whether the two texts are talking about the same topic.
+- **Interview Talking Point**: *"In document retrieval, text lengths vary dramatically. Cosine distance normalizes vector magnitude, evaluating directional alignment rather than Euclidean length, ensuring invariant matching between short queries and long document passages."*
+
+---
+
+### Concept 4: HNSW (Hierarchical Navigable Small World)
+- **Technical Identity**: Graph-Based Approximate Nearest Neighbor (ANN) Indexing Algorithm (implemented inside PostgreSQL via `pgvector`).
+- **Full Form**: **H**ierarchical **N**avigable **S**mall **W**orld.
+- **What is it actually? (Is it an engine or system?)**: **It is a database indexing algorithm and data structure**, exactly like a B-Tree or Hash Index in traditional SQL. You do not install an "HNSW server"; instead, PostgreSQL's `pgvector` extension organizes our 2,793 document vectors into a multi-layered connected graph inside PostgreSQL memory.
+- **The Breakdown of the 4 Words**:
+  1. **Hierarchical**: Built in multiple layers, exactly like an express highway system vs. residential streets.
+  2. **Navigable**: The search engine can "hop" from node to neighbor node efficiently using greedy routing.
+  3. **Small World**: Based on the mathematical "Six Degrees of Separation" principle—any vector in the graph can be reached from any other vector in just a few hops.
+  4. **Graph**: Data points (chunks) are connected to their closest semantic neighbors by mathematical edges.
+- **Everyday Analogy**: **Google Maps Navigation**. Suppose you want to drive from Times Square in New York to a specific house in Beverly Hills, California:
+  - **Flat Brute-Force Search ($O(N)$)**: You drive down every single street in America, checking house numbers one by one until you find Beverly Hills. That takes forever.
+  - **HNSW Graph Search ($O(\log N)$)**:
+    - **Layer 2 (The Interstate Highway)**: You take Interstate 80 across the country in giant, fast hops.
+    - **Layer 1 (The State Highway)**: When you get near Los Angeles, you drop down to the state highway (Route 101) to get into the city.
+    - **Layer 0 (The Local Street)**: You exit onto the local residential street to find the exact driveway.
+- **Why Document Assistant Uses HNSW Instead of IVFFlat**:
+  - **IVFFlat** divides vectors into clusters using $k$-means. It is fast, but if you add new filings, you must re-train the index, and its recall is only $70\text{--}80\%$.
+  - **HNSW** achieves $>98\%$ recall, searches 2,793 vectors in **2 to 5 milliseconds**, and allows new 10-K filings to be added dynamically without rebuilding the index.
+- **The Key Parameters ($M=16$, `ef_construction=64`)**:
+  - $M = 16$: Every chunk vector maintains 16 bidirectional connections to its closest neighbors.
+  - `ef_construction = 64`: During index creation, PostgreSQL evaluates 64 candidate neighbors at each hop to build a resilient graph structure.
+- **Interview Talking Point**: *"HNSW builds a multi-layer skip-list graph over high-dimensional vector space. It replaces $O(N)$ brute-force scans with $O(\log N)$ greedy graph routing, delivering sub-5ms search latencies with over 98% recall on our Supabase PostgreSQL instance."*
+
+---
+
+### Concept 5: Sparse Retrieval (Lexical / Keyword Search)
+- **Technical Identity**: Inverted-Index Information Retrieval System.
+- **Plain-English Meaning**: Searching for exact character sequences, word stems, and specific numbers.
+- **Everyday Analogy**: The **`Ctrl + F`** keyboard shortcut. If you press `Ctrl + F` and type `"Item 7A"`, it instantly jumps to the exact page where those exact characters appear.
+- **Why Document Assistant Uses It**: Vector embeddings suffer from **"numerical blindness"**: the vector for `"$96,169 million"` and the vector for `"$96,170 million"` are mathematically 99.9% identical. If an analyst asks for Apple's exact 2024 iPhone revenue, dense vector search might return the 2023 number because the words around it are identical. Sparse search matches the exact number `96,169` without error.
+- **Interview Talking Point**: *"Dense vector search provides conceptual semantic recall, while sparse lexical search guarantees precision on exact numerical figures, statutory Item headers, and ticker symbols."*
+
+---
+
+### Concept 6: PostgreSQL `tsvector`, GIN Index & `ts_rank_cd`
+- **Technical Identity**: Native PostgreSQL Full-Text Search Subsystem.
+- **Full Form**:
+  - `tsvector` = Text Search Vector (a document converted into normalized, stemmed words called lexemes).
+  - GIN = **G**eneralized **I**nverted **I**ndex (an inverted index table).
+  - `ts_rank_cd` = Text Search Rank by **C**over **D**ensity.
+- **Plain-English Meaning**:
+  - `tsvector` takes a sentence like *"Apple's revenues are increasing"* and strips it down to base roots and positions: `'appl':1 'increas':4 'revenu':2`.
+  - The **GIN Index** works like the **alphabetical index at the back of a textbook**: when you look up `'revenu'`, it immediately gives you a list of all 1,200 chunk IDs containing that word.
+  - `ts_rank_cd` measures **how close the words are to each other**. If you search for *"Traffic Acquisition Costs"*, a paragraph where those three words are right next to each other gets a high score. A paragraph where *"Traffic"* is on line 1 and *"Costs"* is 40 lines later gets a low score.
+- **Why Document Assistant Uses It**: Financial accounting terms are multi-word phrases (e.g. *"remaining performance obligations"* or *"unearned revenue"*). Cover Density ensures that chunks discussing the exact accounting concept rank far above chunks that merely mention the word "revenue" in passing.
+- **Interview Talking Point**: *"We use PostgreSQL's GIN-indexed tsvector with ts_rank_cd cover density ranking because financial queries demand phrase proximity scoring rather than naive bag-of-words term frequency."*
+
+---
+
+### Concept 7: Reciprocal Rank Fusion (RRF, $k=60$)
+- **Technical Identity**: Unsupervised Rank Aggregation Algorithm.
+- **Plain-English Meaning**: A mathematical method to merge the Top 20 results from Dense Vector search and the Top 20 results from Sparse Keyword search into a single master ranking list.
+- **Everyday Analogy**: **Two Olympic Judges with Different Scoring Scales**. 
+  - Judge A (Dense Search) scores athletes on artistic style from 0.00 to 1.00.
+  - Judge B (Sparse Search) scores athletes on race speed from 0 to 500 points.
+  - You cannot add 0.85 style points to 350 speed points—it is mathematically meaningless (apples to oranges).
+  - Instead, you tell both judges: *"Just give me your ranked list: who was #1, who was #2, who was #3?"*
+  - RRF takes their rank positions and calculates: $\text{Score} = \frac{1}{60 + \text{Rank}_A} + \frac{1}{60 + \text{Rank}_B}$.
+  - If a document is ranked #1 by both judges, it gets the highest possible score: $\frac{1}{61} + \frac{1}{61} = 0.03278$.
+- **Why $k=60$**: It is a mathematical dampener. It prevents an outlier document that was ranked #1 by dense search but #500 by sparse search from dominating the final results. It strongly rewards **consensus** between both branches.
+- **Interview Talking Point**: *"RRF eliminates the fragile score calibration of min-max normalization by operating strictly on ordinal rank positions, utilizing a smoothing factor of $k=60$ to reward multi-modal consensus."*
+
+---
+
+### Concept 8: Neighbor Chunk Expansion ($\pm 1$)
+- **Technical Identity**: Relational Graph Foreign Key Traversal.
+- **Plain-English Meaning**: When our retrieval engine finds a relevant filing chunk, it automatically runs a single SQL query to fetch the chunk that came immediately before it (`prev_chunk_id`) and the chunk that came immediately after it (`next_chunk_id`).
+- **Everyday Analogy**: **Zooming Out a Camera Lens**. If you take a close-up photo of a financial table, the camera might capture the numbers but cut off the top column headers or the explanatory footnote at the bottom. Neighbor expansion zooms out by one step, letting the AI see the header, the data rows, and the footnote together.
+- **Why Document Assistant Uses It**: SEC 10-K financial tables frequently span 2 to 3 printed pages. Slicing documents into small 500-token chunks is necessary for precise vector search, but without neighbor expansion, the table loses its column titles and footnotes.
+- **Interview Talking Point**: *"Neighbor expansion resolves the classic RAG dilemma between retrieval granularity and reasoning context: we index small chunks for high search precision, but expand to $\pm 1$ neighbor foreign keys at inference time to reconstruct complete financial schedules."*
+
+---
+
+### Concept 9: Sliding Window History & Ticker Inheritance
+- **Technical Identity**: Conversational State Machine & Memory Bounding.
+- **Plain-English Meaning**: A memory management system that keeps only the last 6 messages (3 conversation turns) in the prompt, while automatically remembering which stock ticker the analyst is analyzing.
+- **Everyday Analogy**: **Short-Term Memory in Dialogue**. If an analyst asks:
+  - *Turn 1*: *"What was Apple's 2024 iPhone revenue?"* (`AAPL`)
+  - *Turn 2*: *"How did that compare to their 2023 revenue?"*
+  - The system automatically inherits `AAPL` so the analyst doesn't have to re-type the word "Apple" in every single prompt.
+- **Why We Cap It at 6 Messages (Instead of 50)**: Feeding 50 old messages into an LLM causes **Context Poisoning** and **Ticker Bleed** (the model gets confused between Apple numbers mentioned 10 turns ago and Microsoft numbers asked right now). 6 messages provides conversational continuity while keeping prompt tokens sub-second fast.
+- **Interview Talking Point**: *"We enforce a strict 6-message sliding window with deterministic ticker inheritance, preventing context window bloat and eliminating cross-company ticker bleed during multi-turn research."*
+
+---
+
+### Concept 10: PydanticAI & Structured Outputs
+- **Technical Identity**: Schema-Driven LLM Agent Framework.
+- **Plain-English Meaning**: A Python framework that forces the AI model to output its answer as a strictly typed JSON object with pre-defined fields, rather than unstructured conversational text.
+- **Everyday Analogy**: An **Official Government Tax Form**. Instead of giving someone a blank piece of lined paper where they can write anything they want, you hand them an official form with required boxes: Box 1 = Narrative Answer, Box 2 = Array of Citations (Ticker, Year, Page, Quote). If they fail to fill in a required box or put text into a number field, the system rejects the output before it can crash the frontend.
+- **Why Document Assistant Uses It**: The React frontend requires structured citation cards, clickable footnotes, and source metadata drawers. PydanticAI uses Rust-backed Pydantic validation to guarantee that the API returns 100% valid, deterministic JSON on every request.
+- **Interview Talking Point**: *"PydanticAI enforces strict compile-time and runtime type safety on LLM outputs using Pydantic schemas, guaranteeing deterministic frontend rendering of citations, financial tables, and metadata."*
+
+---
+
+### Concept 11: The 4-Gate Fail-Closed Grounding Validator
+- **Technical Identity**: Post-Generation Programmatic Gatekeeper.
+- **Plain-English Meaning**: A security checkpoint in Python code that intercepts the AI's generated response before it is displayed to the user, running 4 strict algorithmic verification checks.
+- **Everyday Analogy**: **Airport Security with 4 Metal Detectors**:
+  - **Gate 1 (UUID Check)**: Did the AI cite real chunks that were actually retrieved from Supabase? (Blocks hallucinated citation IDs).
+  - **Gate 2 (Ticker Consistency)**: Does the cited chunk belong to the company being discussed? (Blocks citing Microsoft on an Apple question).
+  - **Gate 3 (Footnote Alignment)**: Does every `[^1]` marker in the text correspond to an actual citation in the citation drawer?
+  - **Gate 4 (Verbatim Substring Check)**: Does the cited quote actually exist word-for-word in the official SEC filing?
+- **What is "Fail-Closed"?**: If any of the 4 gates detects a discrepancy, the system **locks the gate** ("fails closed") and blocks the response. It does not allow a questionable answer to slip through.
+- **Interview Talking Point**: *"Our GroundingValidator operates programmatically rather than relying on self-reflection or LLM-as-a-judge. It enforces a strict fail-closed contract across four deterministic gates in sub-millisecond Python code."*
+
+---
+
+### Concept 12: 2D Waterfall Failover Cascade (2,160+ RPD Architecture)
+- **Technical Identity**: High-Availability Fault-Tolerant API Cascade.
+- **Plain-English Meaning**: A 2-dimensional backup system that rotates between 2 Google API keys first, and if both keys hit a rate limit (HTTP 429), cascades across 7 Google models to guarantee that the system never crashes or shows an error.
+- **The 2 Dimensions**:
+  - **Dimension 1 (Horizontal - API Keys)**: Try Key 1 for Gemini 3 Flash. If rate-limited, immediately try Key 2 for Gemini 3 Flash. (This preserves the analyst's selected model!).
+  - **Dimension 2 (Vertical - Models)**: Only if both keys are exhausted does the system cascade down to Gemini 2.5 Flash, then Gemini 2.0 Flash, then Flash Lite.
+- **Everyday Analogy**: A hospital backup power grid with two independent electrical power lines. If Power Line 1 trips, switch to Power Line 2. Only if both city power lines fail do you start the diesel generator.
+- **Why Document Assistant Uses It**: Free-tier Google AI Studio accounts provide generous quotas (e.g. 500 to 1,500 requests/day per key), but have strict per-minute rate limits. The 2D waterfall unlocks 2,160+ free requests/day with 99.9% uptime at **$0.00 cost**.
+- **Interview Talking Point**: *"The 2D waterfall engine preserves user model fidelity by exhausting horizontal API key rotations before cascading vertically across model tiers, achieving enterprise resilience on zero-cost cloud tiers."*
+
+---
+
+### Concept 13: Server-Sent Events (SSE) & Streaming Protocol
+- **Technical Identity**: HTTP/1.1 & HTTP/2 Unidirectional Streaming Protocol.
+- **Plain-English Meaning**: A real-time connection from the FastAPI backend to the React frontend where text tokens and status updates are sent continuously as they are generated.
+- **Everyday Analogy**: A **Live News Ticker Tape**. Instead of waiting for a news reporter to finish writing an entire 10-page article before you can read anything (traditional HTTP request-response), the words appear on your screen letter-by-letter as they are being typed.
+- **Why Document Assistant Uses It Instead of WebSockets**: WebSockets are bidirectional and heavy—they require custom handshake protocols and dedicated socket server processes. SSE runs over standard HTTP, works seamlessly through firewalls and CDNs, has built-in browser reconnection, and is natively supported by the Vercel AI SDK data stream protocol.
+- **Interview Talking Point**: *"We use Server-Sent Events (SSE) over standard HTTP streaming using the Vercel AI SDK Data Stream protocol, streaming real-time status frames (`2:`), word tokens (`0:`), and citation payloads with minimal memory overhead."*
+
+---
+
+### Concept 14: 0ms Optimistic UI Mounting
+- **Technical Identity**: Client-Side Latency Masking & Reconciliation Pattern.
+- **Plain-English Meaning**: Showing the user's prompt bubble and a glowing status indicator in the browser at tick 0 (0 milliseconds), while the database conversation thread is created in the background.
+- **Everyday Analogy**: **Instant Table Service at a Restaurant**. The moment you walk into a restaurant, the host immediately seats you and hands you a glass of water (0ms perceived latency). Meanwhile, the host types your party details into the reservation computer in the background. You never feel like you were left waiting at the door.
+- **Why Document Assistant Uses It**: Without optimistic mounting, submitting a question in a new thread caused a 1 to 2 second blank screen delay while the browser waited for Supabase to allocate a thread UUID. Optimistic mounting gives the user instant, snappy feedback.
+- **Interview Talking Point**: *"Optimistic mounting decouples local UI state presentation from remote database persistence, eliminating the 1.5s draft thread creation freeze and achieving 0ms perceived latency."*
+
+---
+
+### Concept 15: Evaluation Metrics (Top-1 Precision, Top-5 Recall, MRR@5)
+- **Technical Identity**: Information Retrieval Empirical Benchmark Metrics.
+- **Plain-English Meaning**: The mathematical report card used to prove whether our search engine actually works on real financial questions.
+- **The 3 Metrics Explained Simply**:
+  1. **Top-1 Precision (80.0%)**: Did our search engine put the single best SEC filing chunk in the **very first position (#1)**? In 12 out of 15 queries (80%), the exact answer was the #1 result.
+  2. **Top-5 Recall (86.7%)**: Was the correct SEC chunk somewhere in the **Top 5 results**? In 13 out of 15 queries (86.7%), the answer was retrieved in the Top 5.
+  3. **MRR@5 (Mean Reciprocal Rank = 0.822)**: A score from 0.0 to 1.0 measuring how close to the top the correct answer was. If the correct answer is at Rank 1, the score is $1/1 = 1.0$. If it is at Rank 2, the score is $1/2 = 0.5$. An MRR of 0.822 proves that almost all correct answers appear in positions #1 or #2.
+- **Interview Talking Point**: *"We validated our hybrid retrieval pipeline against an empirical 15-query ground-truth benchmark on live Supabase data, measuring an 80.0% Top-1 Precision, 86.7% Top-5 Recall, and 0.822 MRR@5."*
+
+> [!NOTE]
+> **Section Transition (Flow to Section 2)**: Now that every foundational concept is clear in plain English, Section 2 examines how these components interconnect in the end-to-end topological architecture.
 
 ---
 
@@ -160,6 +380,23 @@ When an equity analyst submits an inquiry to the Document Assistant, the system 
     - Citation payloads stream as `2:[{"type": "citations", ...}]`.
     - The client renders the markdown response, attaches clickable citation badges, and populates the slide-over Citation Inspection Drawer.
 
+### The Analyst Query Journey in Plain English (The 10-Step Story)
+To understand how these 10 steps feel in practice, follow a real financial inquiry:
+> **Analyst Query**: *"What was Apple's Capital Expenditures in fiscal year 2024, and what drove the change from 2023?"*
+
+1. **At 0 Milliseconds (The Client Reacts)**: The analyst hits Enter. The React client immediately renders the user bubble and shows an active searching indicator (`Searching SEC 10-K filings...`). In the background, a new thread is registered in Supabase.
+2. **At 50 Milliseconds (State & Intent Resolved)**: FastAPI intercepts the HTTP stream. The state machine checks the text, identifies the ticker `AAPL`, and retrieves the last 6 messages of conversational context.
+3. **At 150 Milliseconds (Query Expanded)**: The expansion engine recognizes the financial slang `"CapEx"` and expands the search query to include `"purchases of property, plant, and equipment"`.
+4. **At 300 Milliseconds (Parallel Search)**:
+   - The **Dense Branch** embeds the query with `gemini-embedding-001` and navigates the HNSW vector graph in PostgreSQL using cosine distance (`<=>`), surfacing chunks discussing factory and equipment purchases.
+   - The **Sparse Branch** runs `websearch_to_tsquery` across PostgreSQL's GIN index using `ts_rank_cd`, pinpointing chunks containing the exact phrase `"property, plant, and equipment"` and numbers matching FY2024.
+5. **At 450 Milliseconds (Fusion & Neighbor Expansion)**: Reciprocal Rank Fusion ($k=60$) combines the two lists. The top chunks are selected, and a batch SQL query fetches their neighboring paragraphs (`prev_chunk_id` and `next_chunk_id`) so the AI has the surrounding footnotes.
+6. **At 600 Milliseconds (PydanticAI Reasoning)**: The fused evidence chunks, conversation history, and system instructions are handed to Gemini 3 Flash. If Key 1 hits a rate limit, the 2D waterfall instantly retries on Key 2.
+7. **At 1,200 Milliseconds (Structured Output Generated)**: The LLM produces a structured `GroundedAnswer` containing the narrative explanation, exact numbers ($9,450 million in FY24 vs. $10,959 million in FY23), and the cited SEC chunk IDs.
+8. **At 1,250 Milliseconds (4-Gate Verification)**: `GroundingValidator` programmatically inspects the answer: confirms the chunk IDs are real, verifies the ticker is `AAPL`, checks footnote alignment, and confirms the numbers exist word-for-word in the filing.
+9. **At 1,300 Milliseconds (Streaming to Screen)**: The verified answer streams to the analyst's screen over Server-Sent Events (SSE).
+10. **At 2,000 Milliseconds (Interactive Inspection)**: The complete answer is formatted with alternating table rows and blue citation badges (`[^1]`). The analyst clicks `[^1]`, and the Citation Drawer slides out, highlighting the exact sentence in Apple's 10-K filing.
+
 > [!NOTE]
 > **Section Transition (Flow to Section 3)**: Now that the high-level request-response topology is established, Section 3 examines the foundational data engineering pipeline: ingesting, sanitizing, and chunking complex SEC EDGAR 10-K filings.
 
@@ -203,6 +440,34 @@ Document Assistant implements a purpose-built ETL pipeline across four modular s
   - Loads all 2,793 chunks across 25 filings into Supabase PostgreSQL `document_chunks` table
   - Builds HNSW vector index (m=16, ef_construction=64) and tsvector FTS index
 ```
+
+### In Plain English: The Data Engineering Pipeline Demystified
+
+Before diving into code, let's understand why ingesting SEC 10-K filings is completely different from ingesting standard blog posts or PDF books:
+
+1. **What is an SEC 10-K Filing?**
+   - In the United States, every publicly traded company (Apple, Microsoft, Nvidia, etc.) is legally mandated by the Securities and Exchange Commission (SEC) to publish a massive annual report called a **10-K**.
+   - Unlike marketing presentations, a 10-K is an **audited legal document**. If a company lies in a 10-K, executives face criminal prosecution. Therefore, it contains the ultimate ground truth about revenues, debt, risks, and segment performance.
+   - However, raw 10-K filings from SEC EDGAR are **massive, messy HTML files** (often 10 to 20 Megabytes each), filled with nested HTML tables, non-standard financial characters, and hundreds of pages of legal disclosures.
+
+2. **The "Torn Spreadsheet" Problem (Why Standard AI Chunkers Fail)**:
+   - A traditional RAG tutorial tells you to use a `RecursiveCharacterTextSplitter` that slices text every 500 characters.
+   - Imagine printing out a giant 5-column financial spreadsheet, taking a pair of scissors, and cutting it into 5-inch strips.
+   - Strip #1 has the column headers: `Operating Segment | FY2024 | FY2023 | FY2022`.
+   - Strip #2 has only numbers: `iPhone | $201,183 | $200,583 | $205,489`.
+   - If an AI searches for Strip #2, it finds the number `$201,183`, but it has no idea what that number means! Is it revenue? Is it profit? Is it number of iPhones sold? Without the column headers from Strip #1, the data is completely useless.
+
+3. **The GFM Header Duplication Solution**:
+   - Our pipeline converts HTML tables into clean **GitHub Flavored Markdown (GFM)**.
+   - Whenever an oversized financial table must be split into multiple chunks, our cleaner **duplicates the complete header row at the top of every chunk**.
+   - Every single chunk remains 100% self-contained: the AI always sees both the metric name and the column fiscal year.
+
+4. **The "Train Coupler" Analogy (`prev_chunk_id` & `next_chunk_id`)**:
+   - In a train, every rail car is coupled to the car ahead of it and the car behind it.
+   - When we store document chunks in PostgreSQL, every chunk stores the UUID of its predecessor (`prev_chunk_id`) and successor (`next_chunk_id`).
+   - If our hybrid search retrieves a financial balance sheet table in Chunk #5, the AI can instantly look at Chunk #4 and Chunk #6 without running a new search. This ensures the AI can read critical footnotes and narrative disclosures that immediately follow the table!
+
+---
 
 ### Table Normalization: The GFM Solution
 In an SEC 10-K, financial tables represent the core quantitative evidence. Standard naive chunking splits tables across arbitrary character limits, severing column headers from data rows. An analyst asking for *"2024 iPhone revenue"* might retrieve a row saying `"201,183"`, but without the column header `"Year Ended September 28, 2024"`, the number is completely ungrounded.
@@ -267,7 +532,187 @@ Document Assistant implements a calibrated **Hybrid Retrieval Pipeline with Reci
                      [ Injected Verified Context ]
 ```
 
-### The RRF Mathematical Formulation
+---
+
+### 4.1 Dense Vector Search: Embeddings, Geometry & Dimensionality
+
+The dense retrieval branch is responsible for **semantic understanding**—retrieving information based on conceptual meaning rather than exact word-for-word matches.
+
+#### What Happens Under the Hood?
+1. When an analyst enters an inquiry, the query string is sent to Google's `gemini-embedding-001` model.
+2. The model converts the text into a dense array of **768 floating-point numbers** (e.g., `[-0.0123, 0.0841, -0.0042, ...]`).
+3. Each of the 768 dimensions represents an abstract semantic feature (such as accounting concepts, business sentiment, time horizons, corporate entities, or financial line items).
+4. This 768-dimensional query vector is passed directly into PostgreSQL to find the closest document vectors stored in the `document_chunks.embedding` column.
+
+---
+
+### 4.2 Deep Dive: What is Cosine Distance (`<=>`) and Why Angle Beats Length?
+
+In PostgreSQL with `pgvector`, similarity search between vector $u$ (the query) and vector $v$ (the document chunk) can be performed using three different distance operators:
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                        VECTOR DISTANCE COMPARISON IN PGVECTOR                          │
+├──────────────────────┬──────────┬─────────────────────────────────┬────────────────────┤
+│ Metric               │ Operator │ Mathematical Formula            │ Production Suitability│
+├──────────────────────┼──────────┼─────────────────────────────────┼────────────────────┤
+│ Cosine Distance      │ `<=>`    │ $1 - \frac{u \cdot v}{\|u\| \|v\|}$   │ OPTIMAL for Text   │
+│ Euclidean Distance   │ `<->`    │ $\sqrt{\sum (u_i - v_i)^2}$       │ FAILS on Text      │
+│ Inner (Dot) Product  │ `<#>`    │ $- (u \cdot v)$                 │ Sensitive to length│
+└──────────────────────┴──────────┴─────────────────────────────────┴────────────────────┘
+```
+
+#### Why Euclidean Distance (`<->`) Fails on Financial Filings:
+Euclidean distance measures the physical distance between the coordinates of two arrow tips.
+- A user query is short (e.g. 5 words: *"What is Google's TAC?"*). Its embedding vector has a small overall magnitude.
+- An SEC filing chunk is long (e.g. 500 words). Its embedding vector has a much larger overall magnitude.
+- Even though both texts are discussing the exact same topic (Traffic Acquisition Costs), Euclidean distance calculates a large physical gap between them simply because one text is longer than the other.
+
+#### Why Cosine Distance (`<=>`) Wins:
+Cosine distance measures the **cosine of the angle $\theta$** between the two vector arrows:
+$$\cos(\theta) = \frac{u \cdot v}{\|u\| \|v\|}$$
+$$\text{Cosine Distance} = 1 - \cos(\theta)$$
+- If the two vectors point in the exact same direction ($\theta = 0^\circ$), $\cos(0^\circ) = 1$, and $\text{Cosine Distance} = 1 - 1 = \mathbf{0.0}$ (Identical meaning!).
+- If the two vectors are perpendicular ($\theta = 90^\circ$), $\cos(90^\circ) = 0$, and $\text{Cosine Distance} = 1 - 0 = \mathbf{1.0}$ (Completely unrelated).
+- By dividing by the vector lengths $\|u\|$ and $\|v\|$, **length is completely eliminated from the calculation**. A 5-word query and a 500-word paragraph pointing in the same semantic direction receive a near-zero cosine distance.
+
+---
+
+### 4.3 Deep Dive: What is HNSW (Hierarchical Navigable Small World)?
+
+When an analyst queries the database, PostgreSQL must find the 20 closest document vectors out of all **2,793 ingested chunks**.
+
+#### The Problem: Why Not Just Check Every Vector? (Brute-Force Flat Search)
+In a naive database without an index, finding the nearest neighbors requires a **Sequential Scan**:
+- Compute the cosine distance between the query vector and all 2,793 chunk vectors one by one.
+- For 2,793 vectors of 768 dimensions, this requires $2,793 \times 768 = \mathbf{2,145,024 \text{ float multiplications}}$.
+- As the corpus grows to 250,000 chunks, a sequential scan takes hundreds of milliseconds, saturating CPU cores and causing disk thrashing. Its computational complexity is $\mathbf{O(N)}$.
+
+#### The Solution: HNSW Graph Indexing
+To achieve sub-5ms search times, Document Assistant uses **HNSW (Hierarchical Navigable Small World)** via `pgvector`:
+```sql
+CREATE INDEX idx_document_chunks_embedding_hnsw 
+ON document_chunks 
+USING hnsw (embedding vector_cosine_ops)
+WITH (m = 16, ef_construction = 64);
+```
+
+#### How HNSW Actually Works: The Multi-Layer Highway System
+HNSW is a **multi-layer graph data structure** inspired by skip-lists:
+
+```
+[Layer 2: Express Highways]    Node A ──────────────────────────────► Node Z
+                                 │                                      │
+                                 ▼                                      ▼
+[Layer 1: State Routes]        Node A ────────► Node K ──────────────► Node Z
+                                 │                 │                    │
+                                 ▼                 ▼                    ▼
+[Layer 0: Local Streets]       Node A ──► Node C ─► Node K ──► Node M ─► Node Z
+                               (All 2,793 Chunks Connected as Nearest Neighbors)
+```
+
+1. **Layer 2 (The Express Highway)**: Contains very few nodes with long-distance links across the vector space. The search starts here, making giant jumps toward the query vector.
+2. **Layer 1 (The Regional Highway)**: Once the search gets as close as possible on Layer 2, it drops down to Layer 1, taking medium-distance hops toward the target.
+3. **Layer 0 (The Local Streets)**: The search drops to the base layer containing all 2,793 document vectors, taking small local hops to identify the exact Top 20 nearest neighbors.
+
+#### Computational Complexity:
+Because each layer eliminates the vast majority of irrelevant nodes, HNSW reduces search complexity from **$O(N)$ linear time** to **$O(\log N)$ logarithmic time**:
+- For 2,793 chunks, HNSW evaluates only $\sim 50\text{--}80$ vector comparisons instead of 2,793.
+- Query latency drops to **$2\text{--}5 \text{ milliseconds}$**.
+
+#### What Do the HNSW Parameters Mean?
+- **`m = 16`**: The maximum number of bidirectional edges (neighbor connections) each node maintains in the graph. Setting $m=16$ ensures high connectivity without excessive RAM usage.
+- **`ef_construction = 64`**: The size of the dynamic candidate list evaluated during index creation. Higher values build a more accurate graph at the cost of index build time.
+- **`vector_cosine_ops`**: Informs PostgreSQL to build the graph using Cosine Distance (`<=>`) rather than Euclidean distance.
+
+---
+
+### 4.4 Sparse Keyword Search: `tsvector`, GIN Inverted Index & `ts_rank_cd`
+
+While dense vector search understands concepts, financial research demands **exact lexical precision**.
+
+#### The Problem: Vector "Numerical Blindness"
+If an analyst asks: *"What was Nvidia's Data Center revenue in FY2024?"*, the SEC 10-K filing contains:
+- *"Data Center revenue was $47,525 million in fiscal year 2024..."*
+- *"Data Center revenue was $15,005 million in fiscal year 2023..."*
+
+Because both sentences have identical words except for the numbers, their 768-dimensional vector embeddings are **99.8% identical in space**. Vector search alone cannot reliably distinguish between `$47,525` and `$15,005`.
+
+#### The Solution: PostgreSQL Full-Text Search (FTS)
+Document Assistant executes a parallel keyword search using three native PostgreSQL components:
+
+1. **`tsvector` (Text Search Vector)**:
+   - When a chunk is ingested, PostgreSQL strips HTML and punctuation, converts text to lowercase, removes English stop words (*"the"*, *"and"*, *"in"*), and runs the **Porter Stemming Algorithm** to reduce words to their base roots:
+     ```sql
+     to_tsvector('english', 'Apple revenues are increasing')
+     --> 'appl':1 'increas':4 'revenu':2
+     ```
+2. **GIN Index (Generalized Inverted Index)**:
+   - Operates like the **alphabetical index at the back of a physical book**.
+   - Maps each stemmed root word to an exact array of chunk IDs where that word appears:
+     ```
+     'datacenter' --> [Chunk 12, Chunk 84, Chunk 312, ...]
+     '47525'      --> [Chunk 84, Chunk 89]
+     ```
+   - When an analyst queries for `"Data Center 47,525"`, PostgreSQL performs an instantaneous set intersection on the GIN index in $< 1\text{ ms}$.
+
+3. **`ts_rank_cd` (Cover Density Ranking)**:
+   - Traditional text ranking (`ts_rank`) merely counts word frequency.
+   - `ts_rank_cd` measures **Cover Density**—how close the query words appear to one another within the document chunk.
+   - If a chunk contains the words *"Data"*, *"Center"*, and *"revenue"* within a single 5-word span, `ts_rank_cd` assigns a high score. If those words are scattered 300 words apart across different sections, the score is penalized.
+
+```sql
+-- Production Sparse Search Query (app/retrieval/retriever.py)
+SELECT id, ts_rank_cd(search_vector, websearch_to_tsquery('english', :query)) AS rank
+FROM document_chunks
+WHERE search_vector @@ websearch_to_tsquery('english', :query)
+ORDER BY rank DESC
+LIMIT 20;
+```
+
+---
+
+### 4.5 Reciprocal Rank Fusion (RRF, $k=60$) Demystified
+
+Now that the Dense Branch has returned its Top 20 candidates and the Sparse Branch has returned its Top 20 candidates, how do we combine them into a single, perfectly ordered list?
+
+#### Why Score Normalization Fails in Production:
+A naive engineer might try to normalize the scores:
+$$\text{Score}_{\text{final}} = 0.5 \times (1 - \text{Cosine Distance}) + 0.5 \times \left(\frac{\text{BM25 Score}}{\text{Max BM25}}\right)$$
+**This fails in production because score scales shift wildly:**
+- For short 2-word queries, BM25 scores might top out at $4.2$.
+- For long 15-word analytical questions, BM25 scores can reach $85.0$.
+- Cosine distances depend heavily on query density. Combining them with fixed weights causes keyword search to dominate on some queries and vector search to dominate on others.
+
+#### The RRF Mathematical Solution:
+Reciprocal Rank Fusion (RRF) ignores raw scores entirely and operates **purely on rank positions** (1st place, 2nd place, 3rd place).
+
+For any document $d$:
+$$\text{RRF Score}(d) = \sum_{m \in \{\text{dense}, \text{sparse}\}} \frac{1}{k + R_m(d)}$$
+Where:
+- $R_m(d)$ is the 1-indexed rank position of document $d$ in branch $m$. If the document did not appear in that branch's top 20, its reciprocal is $0$.
+- $k$ is the smoothing constant, set to $k = 60$.
+
+#### Concrete Calculation Example:
+Suppose we have three candidate chunks:
+- **Chunk A**: Ranked **#1 in Dense** (vector match) and **#1 in Sparse** (exact keyword match).
+- **Chunk B**: Ranked **#2 in Dense** and **#3 in Sparse** (strong consensus across both).
+- **Chunk C**: Ranked **#1 in Dense**, but **did NOT appear in Sparse** (vector outlier).
+
+```
+┌─────────┬────────────┬────────────┬──────────────────────────────────┬───────────┬──────────────┐
+│ Chunk   │ Dense Rank │ Sparse Rank│ RRF Calculation                  │ Final RRF │ Final Result │
+├─────────┼────────────┼────────────┼──────────────────────────────────┼───────────┼──────────────┤
+│ Chunk A │ #1         │ #1         │ 1/(60+1) + 1/(60+1)              │ 0.03278   │ 1st Place 🥇 │
+│ Chunk B │ #2         │ #3         │ 1/(60+2) + 1/(60+3) = .0161+.0158│ 0.03200   │ 2nd Place 🥈 │
+│ Chunk C │ #1         │ Unranked   │ 1/(60+1) + 0                     │ 0.01639   │ 3rd Place 🥉 │
+└─────────┴────────────┴────────────┴──────────────────────────────────┴───────────┴──────────────┘
+```
+**Notice the key insight**: Chunk B (ranked #2 and #3) easily defeats Chunk C (ranked #1 in one modality only). **RRF strongly rewards multi-modal consensus over single-modality outliers.**
+
+---
+
+### 4.6 The RRF Mathematical Formulation
 For any document $d$, its Reciprocal Rank Fusion score is calculated as:
 $$\text{RRF Score}(d) = \sum_{m \in \{\text{dense}, \text{sparse}\}} \frac{1}{k + R_m(d)}$$
 Where:
@@ -417,6 +862,19 @@ class GroundedAnswer(BaseModel):
     refusal_reason: str | None
 ```
 
+### In Plain English: The PydanticAI Reasoning Core Demystified
+
+1. **Why PydanticAI Instead of Raw API Calls?**
+   - **The "Liquid Plastic into a Mold" Analogy**: When you prompt a raw LLM, it outputs free-form, conversational text (like liquid plastic). But a modern React frontend needs structured data: it needs an exact list of numbers, a list of citation UUIDs, and a markdown table.
+   - **Pydantic** is a strict Python mold. The LLM's output is poured into that mold and validated: every citation must have a valid UUID, a ticker symbol, and a source quote. If the model makes a mistake, Python immediately catches it at runtime before sending it to the frontend.
+
+2. **The 2D Waterfall Engine (The Two-Plug Hospital Generator Analogy)**:
+   - Free-tier Google AI Studio provides generous quotas, but hits strict rate limits (e.g. 20 requests/minute on Gemini 3 Flash).
+   - If a hospital has a primary power line and a backup generator, it doesn't immediately shut down intensive care when Power Line 1 trips. It switches to Power Line 2 first!
+   - **Dimension 1 (Horizontal)**: The engine switches from Google API Key 1 to Google API Key 2 **on the exact same model** chosen by the analyst (`Gemini 3 Flash`). This preserves model quality.
+   - **Dimension 2 (Vertical)**: Only if both Key 1 and Key 2 are exhausted does the engine cascade down to the next model tier (`Gemini 2.5 Flash`, then `Gemini 2.0 Flash Lite`).
+   - **Result**: Zero user-facing crashes, zero quota error messages, and 2,160+ free daily requests at $0.00 cost.
+
 > [!NOTE]
 > **Section Transition (Flow to Section 7)**: Generating a structured answer is only half the battle; ensuring institutional veracity is paramount. Section 7 presents the 4-gate fail-closed Grounding Validator that intercepts and verifies every candidate response.
 
@@ -432,6 +890,21 @@ To guarantee that no hallucinated statistics ever reach an analyst, the backend 
 └────────────────────────────────────┬────────────────────────────────────┘
                                      │
                                      ▼
+### In Plain English: Why Programmatic Verification Beats "Asking the LLM"
+
+1. **The Polygraph Fallacy (Why "Self-Reflection" Fails)**:
+   - Many naive AI systems ask the LLM: *"Did you hallucinate? Please check your answer."*
+   - This is like giving a liar a lie detector test that they control: an LLM that hallucinates a number is often 99% confident that the number is real! It will happily answer *"Yes, my answer is 100% grounded!"*
+   - Document Assistant rejects "LLM-as-a-judge" prompts in favor of **cold, deterministic Python code**.
+
+2. **The 4 Security Metal Detectors**:
+   - **Gate 1 (UUID Check)**: Did the LLM cite real chunk UUIDs that were actually fetched from the Supabase database in this turn? (Stops the AI from inventing citation references out of thin air).
+   - **Gate 2 (Ticker Integrity)**: Does the cited chunk belong to the company being asked about? (Stops Apple revenue from being backed by a Microsoft citation).
+   - **Gate 3 (Footnote Alignment)**: Does every `[^1]` marker in the text link to an actual citation in the drawer? (Stops broken frontend links).
+   - **Gate 4 (Verbatim Substring Check)**: Does the quoted text actually appear word-for-word inside the official SEC filing? (Guarantees zero-hallucination factual quotes).
+
+---
+
 ┌─────────────────────────────────────────────────────────────────────────┐
 │ GATE 1: UUID Provenance Check                                           │
 │ - Verifies that every CitationItem.chunk_id belongs to the retrieved    │
