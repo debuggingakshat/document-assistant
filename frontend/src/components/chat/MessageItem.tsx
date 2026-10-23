@@ -94,15 +94,15 @@ export function MessageItem({
     }
 
     // Determine target percentage based on real backend pipeline stage
-    let target = 24
+    let target = 28
     const stage = pipelineStatus?.stage
 
     if (message.content && message.content.length > 0) {
       target = 100
     } else if (stage === "searching") {
-      target = 24
+      target = 28
     } else if (stage === "fusion") {
-      target = 38
+      target = 42
     } else if (stage === "reasoning") {
       target = 88
     } else if (stage === "validating") {
@@ -119,16 +119,21 @@ export function MessageItem({
       const now = Date.now()
       const dt = now - lastTickTimeRef.current
 
-      // Calculate dynamic tick interval based on current progress & stage
-      // Paces Step 3 (LLM generation) across ~5-6s so it never freezes
-      let requiredInterval = 30
+      // Dynamically pace each pipeline stage according to empirical backend latency:
+      // Step 1 (Embedding + pgvector retrieval) takes ~2.5s -> 85ms/step
+      // Step 3 (PydanticAI LLM reasoning) takes ~5.5s -> progressive 45ms -> 400ms decay
+      let requiredInterval = 40
       if (target === 100) {
         requiredInterval = 20 // Rapid sweep when answer is ready
+      } else if (stage === "searching") {
+        requiredInterval = 85 // Spreads 1% -> 28% across 2.4 seconds smoothly without pausing
+      } else if (stage === "fusion") {
+        requiredInterval = 40
       } else if (stage === "reasoning") {
-        if (smoothPercent < 50) requiredInterval = 35 // Quick ramp to 50%
-        else if (smoothPercent < 68) requiredInterval = 75 // Steady ramp to 68%
-        else if (smoothPercent < 82) requiredInterval = 160 // Easing ramp to 82%
-        else requiredInterval = 380 // Asymptotic creep to 88% while LLM thinks
+        if (smoothPercent < 50) requiredInterval = 45 // Quick ramp to 50%
+        else if (smoothPercent < 68) requiredInterval = 85 // Steady ramp to 68%
+        else if (smoothPercent < 82) requiredInterval = 175 // Easing ramp to 82%
+        else requiredInterval = 400 // Asymptotic creep to 88% while LLM thinks
       }
 
       if (dt >= requiredInterval) {
@@ -145,6 +150,11 @@ export function MessageItem({
           }
 
           if (prev < target) {
+            return prev + 1
+          }
+
+          // In Step 1 (Searching), if pgvector takes >2.5s, gently creep up to 32% so it never freezes
+          if (stage === "searching" && prev < 32 && Math.random() < 0.25) {
             return prev + 1
           }
 

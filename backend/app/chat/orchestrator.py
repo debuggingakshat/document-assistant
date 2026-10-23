@@ -610,35 +610,44 @@ async def maybe_generate_thread_title(
             logger.info("Deferred title generation for greeting query: '%s'", user_content)
             return None
 
-        try:
-            model = get_llm_model(model_name)
-            title_agent: Agent[None, str] = Agent(
-                model=model,
-                output_type=str,
-                system_prompt=(
-                    "You are an editor for an SEC equity research system. "
-                    "Analyze the user's message to synthesize a concise, professional conversation title.\n\n"
-                    "RULES:\n"
-                    "1. If the message is a greeting, conversational banter, test, or does NOT ask a substantive question "
-                    "(e.g. 'hi bud', 'hey', 'hello there', 'how are you', 'ok leave it i have to sleep', 'test', 'bye', 'thanks'), "
-                    "output EXACTLY: UNTITLED\n"
-                    "2. If the message asks a substantive financial or research question, synthesize a crisp 3 to 5 word title "
-                    "focusing on the company ticker/name and core topic (e.g. 'Amazon FY24 Net Sales', 'Apple Services Gross Margin', 'Nvidia Data Center Growth').\n"
-                    "3. Do NOT use quotation marks, punctuation, or generic filler words like 'Analysis of', 'Question about'.\n"
-                    "4. Output ONLY the 3-5 word title or UNTITLED."
-                ),
-            )
-            res = await title_agent.run(user_content)
-            raw = res.output.strip().strip('"').strip("'").strip()
-            clean_title = (raw.splitlines()[0] if raw.splitlines() else raw).strip(".").strip()[:50]
+        title_candidates = ["gemini-3-flash-preview", "gemini-3.5-flash-lite", "gemini-flash-lite-latest"]
+        clean_title = None
 
-            # LLM Semantic Gate: If the LLM deemed it conversational banter, defer titling
-            if not clean_title or clean_title.upper() == "UNTITLED" or clean_title.upper().startswith("UNTITLED"):
-                logger.info("LLM semantic gate classified query as non-substantive: '%s'", user_content)
-                return None
+        for candidate_name in title_candidates:
+            try:
+                model = get_llm_model(candidate_name)
+                title_agent: Agent[None, str] = Agent(
+                    model=model,
+                    output_type=str,
+                    system_prompt=(
+                        "You are an editor for an SEC equity research system. "
+                        "Analyze the user's message to synthesize a concise, professional conversation title.\n\n"
+                        "RULES:\n"
+                        "1. If the message is a greeting, conversational banter, test, or does NOT ask a substantive question "
+                        "(e.g. 'hi bud', 'hey', 'hello there', 'how are you', 'ok leave it i have to sleep', 'test', 'bye', 'thanks'), "
+                        "output EXACTLY: UNTITLED\n"
+                        "2. If the message asks a substantive financial or research question, synthesize a crisp 3 to 5 word title "
+                        "focusing on the company ticker/name and core topic (e.g. 'Amazon FY24 Net Sales', 'Apple Services Gross Margin', 'Nvidia Data Center Growth').\n"
+                        "3. Do NOT use quotation marks, punctuation, or generic filler words like 'Analysis of', 'Question about'.\n"
+                        "4. Output ONLY the 3-5 word title or UNTITLED."
+                    ),
+                )
+                res = await asyncio.wait_for(title_agent.run(user_content), timeout=5.0)
+                raw = res.output.strip().strip('"').strip("'").strip()
+                extracted = (raw.splitlines()[0] if raw.splitlines() else raw).strip(".").strip()[:50]
 
-        except Exception as e:
-            logger.warning("LLM title generation failed: %s", e)
+                # LLM Semantic Gate: If the LLM deemed it conversational banter, defer titling
+                if not extracted or extracted.upper() == "UNTITLED" or extracted.upper().startswith("UNTITLED"):
+                    logger.info("LLM semantic gate classified query as non-substantive: '%s'", user_content)
+                    return None
+
+                clean_title = extracted
+                break
+            except Exception as candidate_err:
+                logger.warning("Title model '%s' failed: %s; trying next...", candidate_name, candidate_err)
+                continue
+
+        if not clean_title:
             return None
 
         update_thread(client, thread_id, title=clean_title)
@@ -1041,7 +1050,7 @@ async def stream_orchestrated_turn(
     # 9. Yield auto-generated thread title if ready
     if title_task:
         try:
-            generated_title = await asyncio.wait_for(title_task, timeout=1.5)
+            generated_title = await asyncio.wait_for(title_task, timeout=4.0)
             if generated_title:
                 title_payload = {
                     "type": "thread_title",

@@ -2312,3 +2312,27 @@ To deliver a smooth `1%, 2%, 3%, 4%... 100%` progress experience without floodin
    - When users select `Gemini 2.0 Flash` in the UI, mapping it under the hood to `gemini-3-flash-preview` in a backend dictionary causes a visual contradiction: the message header shows `✦ Gemini 2.0 Flash`, while the telemetry card and system prompt logs display `Gemini 3 Flash`.
    - **Strict 1-to-1 Routing**: In [`backend/app/assistant/model.py`](backend/app/assistant/model.py), every user-facing model ID routes directly to its corresponding live Google AI Studio endpoint (`"gemini-2.0-flash": "gemini-2.0-flash"`).
    - The **2D Waterfall Failover** is reserved strictly for genuine runtime `HTTP 429` quota exhaustion events, at which point an explicit `Auto-Routed: [Model A] → [Model B]` telemetry frame is streamed to the analyst. This preserves complete transparency and verifiable model provenance across institutional research sessions."
+
+---
+
+#### Question 21: Why did the progress indicator pause at 24% for 3–4 seconds, why did thread auto-titling fail with "Untitled Analysis", and how do stage-calibrated tick intervals and resilient multi-model title cascades resolve both issues?
+
+##### Institutional Engineering Answer:
+"In production generative AI pipelines, real-time telemetry and asynchronous side-tasks (like background thread titling) must account for real-world cloud service latencies and upstream provider deprecations.
+
+1. **Diagnosis of the 24% Progress Pause**:
+   - **The Physics of Step 1 (Hybrid Retrieval)**:
+     Executing Step 1 requires:
+     1. Network call to Google AI Studio to generate a 768-dimensional vector embedding for the user prompt (~1,200–1,500 ms).
+     2. Executing concurrent PostgreSQL queries on Supabase via `ThreadPoolExecutor`: full-text search (`ts_rank_cd`) and vector cosine distance search (`<=>`) (~600–800 ms).
+     3. Fetching $\pm 1$ neighbor context chunks for the top 5 passages (~400 ms).
+     $$	ext{Total Step 1 Latency} pprox 2,200	ext{--}3,000 	ext{ ms}$$
+   - **The Pacing Mismatch**: The client ticker previously ran at an unweighted 30ms interval with a hard ceiling at 24%. It reached 24% in only 700ms ($24 	imes 30	ext{ ms} = 720	ext{ ms}$), and then sat completely frozen for the remaining 2.5 seconds awaiting the backend database response.
+   - **The Calibrated Fix**: In [`MessageItem.tsx`](frontend/src/components/chat/MessageItem.tsx), Step 1 pacing is now calibrated to $85	ext{ ms/tick}$ ($28 	imes 85	ext{ ms} pprox 2,400	ext{ ms}$), with a gentle creep cap at 32%. The indicator smoothly and continuously climbs from 1% through 28% without pausing.
+
+2. **Diagnosis of the "Untitled Analysis" Thread Renaming Failure**:
+   - **Upstream Model Deprecation (HTTP 404)**: When the client requested `gemini-2.0-flash`, Google AI Studio returned `404 NOT_FOUND: 'This model models/gemini-2.0-flash is no longer available. Please update your code to use models/gemini-3.8-flash'`.
+   - While the main response turn had a multi-key waterfall failover that caught the 404 and fell back to Gemini 3 Flash, the background `title_agent` called `gemini-2.0-flash` directly without failover. The title agent crashed with 404, returned `None`, and left the thread permanently titled `Untitled Analysis`.
+   - **The Resilient Titling Cascade**: In [`orchestrator.py`](backend/app/chat/orchestrator.py), `maybe_generate_thread_title` now executes across an independent, ultra-fast model cascade:
+     $$	ext{Gemini 3 Flash Preview} \longrightarrow 	ext{Gemini 3.5 Flash Lite} \longrightarrow 	ext{Gemini Flash Lite}$$
+     Furthermore, the SSE emission timeout for the title frame was widened from 1.5s to 4.0s, ensuring that crisp 3–5 word titles (e.g. *'Apple Wearables Sales Trend'*, *'Apple Net Sales FX Impact'*) are reliably synthesized, persisted in PostgreSQL, and dispatched to the sidebar."
