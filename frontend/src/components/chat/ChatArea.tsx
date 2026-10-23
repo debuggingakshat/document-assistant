@@ -339,6 +339,16 @@ export function ChatArea({ threadId }: ChatAreaProps) {
     return () => window.removeEventListener("meridian_rotate_prompts", handleRotate)
   }, [])
 
+  // Reset local turn / citation UI states on new research thread
+  useEffect(() => {
+    function handleReset() {
+      setSelectedCitation(null)
+      setActiveVersionMap({})
+    }
+    window.addEventListener("meridian_reset_to_draft", handleReset)
+    return () => window.removeEventListener("meridian_reset_to_draft", handleReset)
+  }, [])
+
   const activePrompts = useMemo(() => {
     const start = promptSetIndex * PROMPTS_PER_SET
     return ALL_STARTER_PROMPTS.slice(start, start + PROMPTS_PER_SET)

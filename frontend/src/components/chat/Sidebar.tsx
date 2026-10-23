@@ -87,6 +87,15 @@ export function Sidebar({
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
 
+  // Local active thread tracker synchronized with background thread creation & resets
+  const [localActiveId, setLocalActiveId] = useState<string | undefined>(activeThreadId)
+
+  useEffect(() => {
+    setLocalActiveId(activeThreadId)
+  }, [activeThreadId])
+
+  const effectiveActiveThreadId = localActiveId ?? activeThreadId
+
   // Collapsed rail popover states
   const [railSearchOpen, setRailSearchOpen] = useState(false)
   const [railSearchQuery, setRailSearchQuery] = useState("")
@@ -230,18 +239,25 @@ export function Sidebar({
     }
   }, [])
 
-  // Listen for newly created threads dispatched when a prompt is sent from draft mode
+  // Listen for newly created threads and draft reset events
   useEffect(() => {
     function handleThreadCreated(e: Event) {
       const newThread = (e as CustomEvent<Thread>).detail
       if (newThread && newThread.id) {
         setThreads((prev) => [newThread, ...prev.filter((t) => t.id !== newThread.id)])
+        setLocalActiveId(newThread.id)
       }
     }
 
+    function handleResetToDraft() {
+      setLocalActiveId(undefined)
+    }
+
     window.addEventListener("meridian_thread_created", handleThreadCreated)
+    window.addEventListener("meridian_reset_to_draft", handleResetToDraft)
     return () => {
       window.removeEventListener("meridian_thread_created", handleThreadCreated)
+      window.removeEventListener("meridian_reset_to_draft", handleResetToDraft)
     }
   }, [])
 
@@ -289,11 +305,12 @@ export function Sidebar({
   }, [filteredThreads])
 
   function handleNewChat() {
-    if (activeThreadId) {
-      navigate("/")
-    } else {
-      // Already at fresh / draft research view, cycle prompt suggestions
-      window.dispatchEvent(new CustomEvent("meridian_rotate_prompts"))
+    setLocalActiveId(undefined)
+    window.dispatchEvent(new CustomEvent("meridian_reset_to_draft"))
+    window.dispatchEvent(new CustomEvent("meridian_rotate_prompts"))
+    navigate("/", { replace: true })
+    if (typeof window !== "undefined") {
+      window.history.replaceState(null, "", "/")
     }
   }
 
@@ -377,7 +394,7 @@ export function Sidebar({
 
     try {
       await updateThread(thread.id, { is_archived: nextArchived })
-      if (nextArchived && activeThreadId === thread.id) {
+      if (nextArchived && effectiveActiveThreadId === thread.id) {
         navigate("/")
       }
     } catch {
@@ -401,7 +418,7 @@ export function Sidebar({
       await deleteThread(threadId)
       setThreads((prev) => prev.filter((t) => t.id !== threadId))
       setArchivedThreads((prev) => prev.filter((t) => t.id !== threadId))
-      if (activeThreadId === threadId) {
+      if (effectiveActiveThreadId === threadId) {
         navigate("/")
       }
     } catch {
@@ -570,7 +587,7 @@ export function Sidebar({
                       </div>
                     ) : (
                       railSearchResults.map((t) => {
-                        const isActive = t.id === activeThreadId
+                        const isActive = t.id === effectiveActiveThreadId
                         return (
                           <button
                             key={t.id}
@@ -652,7 +669,7 @@ export function Sidebar({
                       </div>
                     ) : (
                       pinnedThreads.map((t) => {
-                        const isActive = t.id === activeThreadId
+                        const isActive = t.id === effectiveActiveThreadId
                         return (
                           <button
                             key={t.id}
@@ -724,7 +741,7 @@ export function Sidebar({
                       </div>
                     ) : (
                       recentTenThreads.map((t) => {
-                        const isActive = t.id === activeThreadId
+                        const isActive = t.id === effectiveActiveThreadId
                         return (
                           <button
                             key={t.id}
@@ -1133,7 +1150,7 @@ export function Sidebar({
   // Sub-renderer for individual thread row
   // ---------------------------------------------------------------------------
   function renderThreadItem(thread: Thread) {
-    const isActive = thread.id === activeThreadId
+    const isActive = thread.id === effectiveActiveThreadId
     const isEditing = thread.id === editingThreadId
 
     if (isEditing) {

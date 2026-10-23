@@ -29,6 +29,27 @@ export function useChatStream({ threadId }: UseChatStreamOptions) {
     setActiveThreadId(threadId)
   }, [threadId])
 
+  // Universal reset listener: when user clicks "New Research Thread", clear all session state
+  useEffect(() => {
+    function handleResetToDraft() {
+      setMessages([])
+      setActiveThreadId(undefined)
+      setIsLoading(false)
+      setIsStreaming(false)
+      setPipelineStatus(null)
+      setError(null)
+      justCreatedThreadIdRef.current = null
+      if (typeof window !== "undefined") {
+        window.history.replaceState(null, "", "/")
+      }
+    }
+
+    window.addEventListener("meridian_reset_to_draft", handleResetToDraft)
+    return () => {
+      window.removeEventListener("meridian_reset_to_draft", handleResetToDraft)
+    }
+  }, [])
+
   // Load message history when threadId changes
   useEffect(() => {
     if (!threadId) {

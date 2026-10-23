@@ -2226,3 +2226,66 @@ To deliver a smooth `1%, 2%, 3%, 4%... 100%` progress experience without floodin
 
 3. **Interview Takeaway**:
    *"Never derive distributed system state from a client-side visual interpolation float. In asynchronous AI streaming pipelines, user-facing stage labels must remain strictly anchored to authoritative server events, while visual progress tickers must employ latency-weighted asymptotic velocity decay to maintain perceived responsiveness across highly asymmetrical workloads."*
+
+---
+
+#### Question 19: In Single-Page Applications (SPAs) with optimistic background thread creation, why does native history manipulation (`window.history.replaceState`) cause React Router state desynchronization and freeze the "+ New Research Thread" button, and how does a Universal Draft Reset Protocol eliminate the need for page reloads?
+
+##### Institutional Engineering Answer:
+"When architecting ultra-low latency AI chat interfaces, developers frequently encounter the **Router State Desynchronization Hazard**: using imperative browser APIs (`window.history.replaceState`) to update the URL without notifying declarative router frameworks (such as React Router).
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│             NATIVE BROWSER HISTORY vs DECLARATIVE REACT ROUTER STATE DRIFT             │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+  1. User starts on "/" (Draft View) ──► React Router state: { pathname: "/" }
+  2. First Query Submitted           ──► Thread created in Supabase ("347b69a0...")
+  3. Optimistic URL update           ──► window.history.replaceState("/chat/347b69a0...")
+  
+  [THE DRIFT]:
+  Browser Address Bar : "https://meridian.app/chat/347b69a0..." (REALITY)
+  React Router Stack  : "https://meridian.app/"                (FROZEN IN TIME)
+  Sidebar activeThread: undefined                                (DESYNCHRONIZED)
+  
+  4. User clicks "+ New Research Thread":
+     Sidebar Check: if (activeThreadId) navigate("/") else rotatePrompts()
+     Result: activeThreadId is UNDEFINED! Button assumes user is ALREADY on draft view!
+     Screen State: Suppresses reset, leaves previous conversation permanently mounted.
+```
+
+1. **The Root Cause Analysis**:
+   - **Why `window.history.replaceState` was used initially**: In standard React Router setups, transitioning between distinct route elements (`/` and `/chat/:threadId`) unmounts the `<ChatPage />` and `<ChatArea />` component trees. Unmounting destroys active SSE fetch readers and wipes optimistic messages before tokens can stream. To prevent this layout tear-down, `window.history.replaceState` was used to silently update the address bar.
+   - **The Desynchronization Cascade**: Because native `replaceState` does not emit standard `popstate` events, React Router’s internal `useParams()` and `useLocation()` hooks remain oblivious to the URL change. The layout continues passing `activeThreadId = undefined` down to the sidebar.
+   - **The Action Handler Deadlock**: In [`Sidebar.tsx`](frontend/src/components/chat/Sidebar.tsx), `handleNewChat()` inspected `if (activeThreadId)`. Because `activeThreadId` was undefined, it presumed the analyst was already viewing an empty draft session and merely fired `meridian_rotate_prompts`. Even if `navigate("/")` were invoked, React Router compared the target `"/"` to its internal location `"/"`, detected zero delta, and refused to trigger a re-render.
+   - **Why Refresh (F5) "Worked"**: A hard reload forces the browser to evaluate the actual address bar string, bootstrapping React Router at `/chat/:threadId`. With `activeThreadId` now populated, clicking "+ New Research Thread" successfully recognized the active session, executed `navigate("/")`, and wiped messages.
+
+2. **The Universal Draft Reset Protocol**:
+   To guarantee that "+ New Research Thread" functions seamlessly 100% of the time without requiring a browser refresh, we decoupled reset execution from route comparison:
+
+   - **Component 1: Dual-Track Active ID Synchronization**:
+     [`Sidebar.tsx`](frontend/src/components/chat/Sidebar.tsx) maintains a local `localActiveId` state alongside the router prop. When `useChatStream` allocates a thread in the background, it dispatches `meridian_thread_created`, immediately setting `localActiveId = newThread.id` and illuminating the sidebar active indicator without waiting for a router remount:
+     ```typescript
+     const effectiveActiveThreadId = localActiveId ?? activeThreadId
+     ```
+
+   - **Component 2: Universal Reset Broadcast (`meridian_reset_to_draft`)**:
+     Rather than making thread creation conditional on whether the router perceives an active thread, clicking "+ New Research Thread" executes an unconditional reset cascade:
+     ```typescript
+     function handleNewChat() {
+       setLocalActiveId(undefined)
+       window.dispatchEvent(new CustomEvent("meridian_reset_to_draft"))
+       window.dispatchEvent(new CustomEvent("meridian_rotate_prompts"))
+       navigate("/", { replace: true })
+       if (typeof window !== "undefined") {
+         window.history.replaceState(null, "", "/")
+       }
+     }
+     ```
+
+   - **Component 3: Declarative State Cleansing in `useChatStream`**:
+     [`useChatStream.ts`](frontend/src/lib/useChatStream.ts) subscribes to `meridian_reset_to_draft`. Upon reception, it atomically purges in-flight state:
+     $$	ext{messages} \leftarrow [\;], \quad 	ext{activeThreadId} \leftarrow 	ext{undefined}, \quad 	ext{pipelineStatus} \leftarrow 	ext{null}, \quad 	ext{isStreaming} \leftarrow 	ext{false}$$
+     Simultaneously, [`ChatArea.tsx`](frontend/src/components/chat/ChatArea.tsx) resets citation inspection sheets and turn version maps, immediately exposing fresh rotating starter inquiries.
+
+3. **Interview Takeaway**:
+   *"Whenever you manipulate native browser history (`replaceState`) to bypass framework component unmounting in high-frequency streaming applications, you must establish an explicit Event-Driven Synchronization Bus (`CustomEvent`) between data-fetching hooks and navigational controls. Never gate user-intent actions (like 'New Thread') behind declarative router parameters that may have fallen out of sync with imperative window state."*
