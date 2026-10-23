@@ -1166,6 +1166,21 @@ Communication between the React client and FastAPI backend uses **Server-Sent Ev
 ### Frontend UI/UX Architecture
 - **5-Model Selector Dropdown (`MessageInput.tsx`)**: Allows analysts to switch between Gemini 3 Flash (Flagship), Gemini 2.5 Flash (Balanced), Gemini 2.0 Flash (Ultra Fast), Gemini 2.0 Flash Lite (Lowest Latency), and Gemini 3.1 Flash Lite (500 RPD High-Capacity Tier) with custom tags and quota badges.
 - **Real-Time 4-Step Technical Stepper (`PipelineStatusIndicator.tsx`)**: Telemetry progress card displaying live pipeline steps (Hybrid Retrieval → RRF Fusion → Agent Reasoning → Grounding Validation). The reasoning step dynamically binds to the active model (`PydanticAI Reasoning with [Selected Model]`) and instantly displays auto-routing transitions.
+- **Uniform 1% ➔ 100% Progressive Ticker & Asymptotic Easing Engine (`MessageItem.tsx`)**:
+  - **The Diagnostic (The 25% ➔ 75% Discrete Jump Antipattern)**:
+    - In naive streaming implementations, progress percentages are tied statically to discrete backend strings (`searching` = 25%, `fusion` = 50%, `reasoning` = 75%, `validating` = 90%, `complete` = 100%).
+    - In production, this produces a jarring, choppy user experience:
+      1. On query submit, the UI jumps directly to **25%** while PostgreSQL runs hybrid retrieval (~600ms).
+      2. The backend emits `stage="fusion"` (50%) and `stage="reasoning"` (75%) on adjacent lines of Python with zero async delay in between. The browser receives both in the same network packet, causing the UI to **completely skip 50%** and jump from 25% straight to 75%.
+      3. While Google Gemini performs LLM generation (2–3 seconds), the backend emits zero events, leaving the progress bar completely frozen at **75%**.
+      4. Once Gemini finishes, in-memory validation runs in 1ms, and the backend immediately streams the first word token (`0:"In "`). The moment text arrives, the progress bar is unmounted from the DOM before ever displaying 90% or 100%.
+    - Consequently, analysts only ever observed a frozen jump from 25% to 75% before the answer appeared.
+  - **The Engineering Solution: Client-Side Continuous Animation Controller**:
+    - Replaced the static stage map with a continuous, high-frequency animation controller running on `requestAnimationFrame` with a 30ms tick-rate.
+    - **Uniform Linear Progression**: Progress climbs smoothly: `1%, 2%, 3%, 4%... 25%... 50%... 75%... 95%`.
+    - **Stage-Aware Target Guiding**: Backend SSE events act as soft ceilings (`searching` → 28%, `fusion` → 52%, `reasoning` → 92%).
+    - **Asymptotic Easing**: If Gemini takes longer to reason, the ticker asymptotically eases (+1 every ~150ms) between 91% and 95%, keeping the interface lively and responsive without ever stalling or prematurely claiming 100%.
+    - **Guaranteed 100% Finale**: The moment content is ready, the controller executes a rapid finish sweep to **100%** (`Step 4 of 4: Verification Complete`), holds the 10-bar indicator at 100% for 250ms as a crisp visual confirmation, and then seamlessly reveals the streamed markdown answer.
 - **Dynamic Assistant Message Header Badge (`MessageItem.tsx`)**: Inspects `message.ai_sdk_metadata.model` to authentically render the exact model badge (`✦ Gemini 3 Flash`, `✦ Gemini 2.5 Flash`, etc.) with timestamps and branch navigation.
 - **Glassmorphic Warning & Callout Card Styler (`MessageItem.tsx`)**: Transforms markdown `> [!WARNING]` blocks and system demand notices into sleek, amber-bordered callout cards with glowing alert icons matching the Meridian dark palette.
 - **Citation Inspection Drawer & Sheet (`SourcePassageSheet.tsx`)**: Clicking any citation badge (`[^1]`) slides open an inspection drawer displaying the source document, filing date, Item section, and exact source excerpt with highlighted financial figures.
@@ -2136,5 +2151,22 @@ Enterprise Scale Architecture (S&P 500 & 10,000 Daily Queries):
    - **Zero Layout Shift & Zero Router Remount**: Using `window.history.replaceState` updates the browser URL without triggering a React Router route remount, preserving component state and active DOM nodes.
    - **Idempotent Guard (`justCreatedThreadIdRef`)**: Route changes trigger `useEffect([threadId])`, which normally wipes and re-fetches message history. The ref acts as an atomic barrier, signaling to the hook that the active thread was just born locally, preventing a redundant round-trip that would overwrite in-flight streaming tokens.
    - **Rollback Resilience**: In the event of a network failure during thread creation, an atomic filter cleanses the optimistic entries, restores user prompt recovery, and alerts the analyst."
+
+---
+
+#### Question 17: In real-time generative AI streaming architectures, why do server-emitted pipeline stages cause jarring discrete progress jumps (e.g. jumping from 25% directly to 75% and freezing), and how does an asymptotic client-side ticker controller engineer a uniform 1% ➔ 100% perception of progress?
+
+##### Institutional Engineering Answer:
+"In distributed systems, the backend cannot predict the future: neither Google AI Studio nor PostgreSQL emits fractional percentage ticks during processing. Tying UI percentage progress directly to server event strings creates three visual failure modes:
+
+1. **The 50% Skip**: In our backend orchestrator, `stage="fusion"` and `stage="reasoning"` are yielded sequentially on adjacent Python lines with zero async gap. The browser receives both frames in the same TCP packet, causing the UI to jump from 25% straight to 75%, completely skipping the 50% milestone.
+2. **The 75% Freeze**: During the 2 to 3 seconds that Gemini takes to synthesize financial disclosures, the server emits zero events. A naive UI sits frozen at 75%, creating the perception of a stalled connection.
+3. **The 100% Disappearance**: Programmatic grounding validation runs in under 2ms, followed immediately by token streaming. The arrival of the first word token unmounts the progress bar before the user ever sees 90% or 100%.
+
+**The Client-Side Asymptotic Ticker Solution**:
+To deliver a smooth `1%, 2%, 3%, 4%... 100%` progress experience without flooding the network with micro-events, we engineered a client-side progressive ticker on `requestAnimationFrame` (30ms tick-rate):
+- **Stage-Aware Ceiling Guidance**: Server events set soft directional ceilings (`searching` → 28%, `fusion` → 52%, `reasoning` → 92%). The client increments steadily by +1% per tick.
+- **Asymptotic Easing**: If LLM generation takes longer than anticipated, the ticker asymptotically decays its rate between 91% and 95%, keeping the interface lively without ever stalling or prematurely claiming 100%.
+- **Deterministic 100% Finale**: When tokens or completion frames arrive, the ticker rapidly sweeps to 100% (`Step 4 of 4: Verification Complete`), holds all 10 filled bars for a 250ms celebration, and smoothly transitions to the rendered answer."
 
 ---

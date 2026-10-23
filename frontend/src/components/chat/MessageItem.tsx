@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import {
   AlertTriangle,
   Check,
@@ -78,29 +78,114 @@ export function MessageItem({
     }
   }
 
-  // Calculate 10-bar progress during initial generation before tokens arrive
+  // Uniform 1% -> 100% progressive ticker with asymptotic easing and 100% completion hold
+  const [smoothPercent, setSmoothPercent] = useState<number>(1)
+  const [hasFinished100, setHasFinished100] = useState<boolean>(false)
+  const animFrameRef = useRef<number | null>(null)
+  const lastTickTimeRef = useRef<number>(Date.now())
+
+  const shouldShowProgress = !isUser && isStreamingLast && (!message.content || !hasFinished100)
+
+  useEffect(() => {
+    if (!isStreamingLast || isUser) {
+      setSmoothPercent(1)
+      setHasFinished100(false)
+      return
+    }
+
+    // Determine target percentage based on stage or content readiness
+    let target = 28
+    const stage = pipelineStatus?.stage
+
+    if (message.content && message.content.length > 0) {
+      target = 100
+    } else if (stage === "searching") {
+      target = 28
+    } else if (stage === "fusion") {
+      target = 52
+    } else if (stage === "reasoning") {
+      target = 92
+    } else if (stage === "validating" || stage === "complete") {
+      target = 100
+    }
+
+    let isRunning = true
+
+    function tick() {
+      if (!isRunning) return
+
+      const now = Date.now()
+      const dt = now - lastTickTimeRef.current
+
+      // Tick update every ~30ms for smooth 1%, 2%, 3%... uniform progression
+      if (dt >= 30) {
+        lastTickTimeRef.current = now
+
+        setSmoothPercent((prev) => {
+          if (prev >= 100) {
+            return 100
+          }
+
+          if (target === 100) {
+            // Rapid finish sweep to 100% when answer is ready
+            return Math.min(100, prev + 4)
+          }
+
+          if (prev < target) {
+            // Standard uniform progress (+1 per tick)
+            return prev + 1
+          }
+
+          // Asymptotically creep while awaiting next stage so it never freezes
+          if (prev < 95 && Math.random() < 0.25) {
+            return prev + 1
+          }
+
+          return prev
+        })
+      }
+
+      animFrameRef.current = requestAnimationFrame(tick)
+    }
+
+    animFrameRef.current = requestAnimationFrame(tick)
+
+    return () => {
+      isRunning = false
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current)
+      }
+    }
+  }, [isStreamingLast, isUser, pipelineStatus?.stage, message.content])
+
+  // Hold at 100% for 250ms celebration before seamlessly revealing answer
+  useEffect(() => {
+    if (smoothPercent >= 100 && message.content && message.content.length > 0) {
+      const timer = setTimeout(() => {
+        setHasFinished100(true)
+      }, 250)
+      return () => clearTimeout(timer)
+    }
+  }, [smoothPercent, message.content])
+
+  // Compute dynamic label and 10-bar fill from uniform smoothPercent
   const progressInfo = useMemo(() => {
-    if (!pipelineStatus) {
-      return { percent: 10, label: "Initializing pipeline...", filledBars: 1 }
+    const percent = Math.min(100, Math.max(1, Math.round(smoothPercent)))
+    const filledBars = Math.min(10, Math.max(1, Math.ceil(percent / 10)))
+
+    let label = "Step 1 of 4: Hybrid Retrieval"
+    if (percent >= 30 && percent < 55) {
+      label = "Step 2 of 4: Rank Fusion"
+    } else if (percent >= 55 && percent < 90) {
+      label = "Step 3 of 4: Agent Synthesis"
+    } else if (percent >= 90 && percent < 100) {
+      label = "Step 4 of 4: Grounding Verification"
+    } else if (percent >= 100) {
+      label = "Step 4 of 4: Verification Complete"
     }
-    const stage = pipelineStatus.stage
-    if (stage === "searching") {
-      return { percent: 25, label: "Step 1 of 4: Hybrid Retrieval", filledBars: 3 }
-    }
-    if (stage === "fusion") {
-      return { percent: 50, label: "Step 2 of 4: Rank Fusion", filledBars: 5 }
-    }
-    if (stage === "reasoning") {
-      return { percent: 75, label: "Step 3 of 4: Agent Synthesis", filledBars: 8 }
-    }
-    if (stage === "validating") {
-      return { percent: 90, label: "Step 4 of 4: Grounding Verification", filledBars: 9 }
-    }
-    if (stage === "complete") {
-      return { percent: 100, label: "Verification complete", filledBars: 10 }
-    }
-    return { percent: 50, label: "Processing SEC disclosures...", filledBars: 5 }
-  }, [pipelineStatus])
+
+    return { percent, label, filledBars }
+  }, [smoothPercent])
 
   // Map citation_index to Citation object + parse inline source entries from text
   const citationMap = useMemo(() => {
@@ -592,8 +677,8 @@ export function MessageItem({
               : "border border-border/70 bg-card text-foreground"
           )}
         >
-          {/* While generating and no content has arrived yet: Segmented 10-Bar Indicator */}
-          {!isUser && isStreamingLast && !message.content ? (
+          {/* While generating: Uniform 1% -> 100% Segmented 10-Bar Indicator */}
+          {shouldShowProgress ? (
             <div className="flex flex-col gap-2.5 py-1 select-none">
               {/* Interactive 10-Bar Segmented Progress Indicator */}
               <div
