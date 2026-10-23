@@ -766,6 +766,26 @@ export function MessageItem({
             <div className={cn("break-words font-normal", isUser ? "whitespace-pre-wrap text-foreground" : "space-y-1 text-[13.5px]")}>
               {isUser ? (
                 message.content
+              ) : !message.content ? (
+                <div className="flex flex-col gap-2 rounded-lg border border-border/70 bg-muted/30 p-3 text-xs text-muted-foreground my-1 select-none">
+                  <div className="flex items-center gap-1.5 font-medium text-foreground">
+                    <AlertTriangle className="size-3.5 text-amber-500" />
+                    <span>Response interrupted or connection ended</span>
+                  </div>
+                  <p className="text-[11.5px] leading-relaxed">
+                    The stream completed before text was fully received. This can occur during upstream provider failover or network resets.
+                  </p>
+                  {onRegenerate && (
+                    <button
+                      type="button"
+                      onClick={onRegenerate}
+                      className="inline-flex items-center gap-1.5 w-fit rounded-md bg-primary px-2.5 py-1 text-[11px] font-medium text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer mt-0.5"
+                    >
+                      <RotateCw className="size-3" />
+                      <span>Regenerate Response</span>
+                    </button>
+                  )}
+                </div>
               ) : (
                 renderFormattedContent(message.content)
               )}

@@ -195,7 +195,7 @@ export function Sidebar({
     localStorage.setItem("sidebar_width", "280")
   }
 
-  // Listen for real-time auto-generated thread title updates
+  // Listen for real-time auto-generated thread title updates & stream completions
   useEffect(() => {
     function handleThreadTitleUpdate(e: Event) {
       const customEvent = e as CustomEvent<{ threadId: string; title: string }>
@@ -206,9 +206,21 @@ export function Sidebar({
       )
     }
 
+    function handleStreamFinished(e: Event) {
+      const customEvent = e as CustomEvent<{ threadId?: string }>
+      const targetTid = customEvent.detail?.threadId
+      if (!targetTid) return
+      // Re-fetch active threads so newly generated title in Supabase is immediately visible in the sidebar
+      listThreads(false).then((activeList) => {
+        setThreads(activeList)
+      }).catch(() => {})
+    }
+
     window.addEventListener("thread_title_updated", handleThreadTitleUpdate)
+    window.addEventListener("meridian_stream_finished", handleStreamFinished)
     return () => {
       window.removeEventListener("thread_title_updated", handleThreadTitleUpdate)
+      window.removeEventListener("meridian_stream_finished", handleStreamFinished)
     }
   }, [])
 

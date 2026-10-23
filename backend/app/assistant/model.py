@@ -18,9 +18,9 @@ MODEL_ALIASES: dict[str, str] = {
     "gemini-3-flash": "gemini-3-flash-preview",
     "gemini-3.5-flash-lite": "gemini-3.5-flash-lite",
     "gemini-flash-lite-latest": "gemini-flash-lite-latest",
-    # Backward compatibility mappings for deprecated Google AI Studio endpoints
-    "gemini-2.0-flash": "gemini-3-flash-preview",
-    "gemini-2.5-flash": "gemini-3-flash-preview",
+    # Backward compatibility mappings: map legacy flash aliases to high-quota 1,500 RPD endpoints
+    "gemini-2.0-flash": "gemini-3.5-flash-lite",
+    "gemini-2.5-flash": "gemini-3.5-flash-lite",
     "gemini-2.0-flash-lite": "gemini-flash-lite-latest",
     "gemini-3.1-flash-lite-preview": "gemini-3.5-flash-lite",
     "gemini-3.1-flash-lite": "gemini-3.5-flash-lite",
@@ -30,11 +30,11 @@ MODEL_ALIASES: dict[str, str] = {
     "gemini-flash-latest": "gemini-flash-latest",
 }
 
-# Dynamic fallback sequence unlocking 2,160+ RPD free capacity across dual keys
+# Dynamic fallback sequence unlocking 2,160+ RPD free capacity across dual keys (high quota first)
 FALLBACK_MODELS: list[str] = [
-    "gemini-3-flash-preview",
     "gemini-3.5-flash-lite",
     "gemini-flash-lite-latest",
+    "gemini-3-flash-preview",
     "gemini-3.8-flash",
     "gemini-3.7-flash",
 ]

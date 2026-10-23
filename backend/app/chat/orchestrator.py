@@ -610,7 +610,7 @@ async def maybe_generate_thread_title(
             logger.info("Deferred title generation for greeting query: '%s'", user_content)
             return None
 
-        title_candidates = ["gemini-3-flash-preview", "gemini-3.5-flash-lite", "gemini-flash-lite-latest"]
+        title_candidates = ["gemini-3.5-flash-lite", "gemini-flash-lite-latest", "gemini-3-flash-preview"]
         clean_title = None
 
         for candidate_name in title_candidates:

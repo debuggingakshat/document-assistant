@@ -305,6 +305,15 @@ export function useChatStream({ threadId }: UseChatStreamOptions) {
             }
           }
         }
+
+        // Inform application that stream finished to trigger title & thread synchronization
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("meridian_stream_finished", {
+              detail: { threadId: targetThreadId },
+            })
+          )
+        }
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : "Failed to send message"
         setError(errMsg)
