@@ -2170,3 +2170,59 @@ To deliver a smooth `1%, 2%, 3%, 4%... 100%` progress experience without floodin
 - **Deterministic 100% Finale**: When tokens or completion frames arrive, the ticker rapidly sweeps to 100% (`Step 4 of 4: Verification Complete`), holds all 10 filled bars for a 250ms celebration, and smoothly transitions to the rendered answer."
 
 ---
+
+---
+
+#### Question 18: In an AI pipeline where one stage (LLM reasoning) takes 5–7 seconds while retrieval and validation take under 350ms, why do naive progress bars freeze and contradict live telemetry cards, and how does a Stage-Anchored Asymptotic Easing Controller eliminate distributed state drift?
+
+##### Institutional Engineering Answer:
+"In production generative AI systems, managing latency perception across highly asymmetric distributed stages is a classic frontend systems engineering challenge. If an LLM call requires 6 seconds while preceding and succeeding stages take mere milliseconds, unweighted progress models inevitably suffer from **perceived unresponsiveness** and **distributed state drift**.
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                        SEC 10-K RETRIEVAL & SYNTHESIS LATENCY ASYMMETRY                │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+  Step 1: Hybrid Retrieval (PostgreSQL FTS + pgvector)   ──► ~250–350 ms  (5% of time)
+  Step 2: RRF Fusion & ±1 Chunk Context Expansion       ──► ~50 ms       (1% of time)
+  Step 3: PydanticAI Reasoning (Gemini Flash Lite API)   ──► ~4,000–7,000 ms (93% of time!)
+  Step 4: 4-Gate Grounding Validation (In-memory Python) ──► ~5 ms        (<0.1% of time!)
+  Step 5: SSE Token Streaming & Client Render           ──► ~100–300 ms  (1% of time)
+```
+
+1. **The Dual Failure Mode in Live Production**:
+   - **Failure Mode A: The 95% Freeze (Pacing Mismatch)**:
+     If a client ticker increments uniformly at a fixed rate (e.g. +1% every 30ms), it races from 0% to 92% in just 2.7 seconds. When it hits an arbitrary asymptotic creep ceiling (`prev < 95`), it stops dead. Because Gemini Flash Lite takes 5 to 7 seconds to parse 15,000 tokens of SEC 10-K disclosures and generate structured JSON, the UI sits completely frozen at 95% for the remaining 4 to 5 seconds, causing users to believe the connection dropped.
+   - **Failure Mode B: Distributed State Drift (Visual Contradiction)**:
+     If human-readable step labels are calculated purely from percentage floats (e.g., `if (percent >= 90) label = "Step 4 of 4: Grounding Verification"`), the UI fabricates state out of thin air. In reality, the backend is still blocked in Step 3 awaiting Gemini's output. The resulting screen presents a jarring contradiction:
+     - *Top Progress Bar*: `95% · Step 4 of 4: Grounding Verification`
+     - *Top Subtitle*: `Injecting verified context window into Gemini Flash Lite system prompt...` (Step 3 text!)
+     - *Lower Telemetry Card*: `PydanticAI Reasoning with Gemini Flash Lite · Step 3 of 4` (Step 3 active, Step 4 unstarted!)
+
+2. **The Stage-Anchored Asymptotic Easing Controller**:
+   We resolved both failure modes in [`MessageItem.tsx`](frontend/src/components/chat/MessageItem.tsx) through a two-part architectural pattern:
+
+   - **Principle 1: Strict Backend Stage Anchoring (Zero State Drift)**:
+     The step title is strictly bound to `pipelineStatus.stage` emitted via Server-Sent Events (SSE). The progress bar is mathematically forbidden from announcing `Step 4 of 4: Grounding Verification` while `stage === "reasoning"`, regardless of the current percentage. Step 4 is only displayed when the backend physically enters `stage="validating"`.
+     ```typescript
+     // Ground-truth stage anchoring:
+     if (stage === "reasoning") {
+       label = "Step 3 of 4: Agent Synthesis" // Never prematurely claims Step 4!
+     } else if (stage === "validating") {
+       label = "Step 4 of 4: Grounding Verification"
+     }
+     ```
+
+   - **Principle 2: Latency-Weighted Asymptotic Velocity Decay**:
+     Instead of a fixed interval, the ticker's velocity curve mirrors the empirical latency distribution of the underlying microservices:
+     - *0% ➔ 24% (Fast, ~30ms interval)*: Hybrid Retrieval (PostgreSQL FTS + pgvector).
+     - *24% ➔ 38% (Fast, ~30ms interval)*: RRF Fusion & Neighbor Expansion.
+     - *38% ➔ 88% (Dynamic Velocity Decay across ~5.5s)*:
+       - `38% ➔ 50%`: 35ms interval (rapid initial ramp giving instant feedback that LLM synthesis has commenced).
+       - `50% ➔ 68%`: 75ms interval (steady progression as prompt tokens are absorbed).
+       - `68% ➔ 82%`: 160ms interval (eased progression during neural network reasoning).
+       - `82% ➔ 88%`: 380ms interval (gentle asymptotic approach as JSON structure is formatted).
+       - `> 88%`: Asymptotic breathing micro-ticks (600ms interval up to 92%) so that even during long 8-second generation bursts, the ticker continuously breathes and never appears frozen.
+     - *88% ➔ 100% (Instant 20ms Sweep)*: Once Gemini returns and the 4 validation gates pass, target snaps to 100%, sweeps at +4% per frame, holds for 250ms, and reveals the answer.
+
+3. **Interview Takeaway**:
+   *"Never derive distributed system state from a client-side visual interpolation float. In asynchronous AI streaming pipelines, user-facing stage labels must remain strictly anchored to authoritative server events, while visual progress tickers must employ latency-weighted asymptotic velocity decay to maintain perceived responsiveness across highly asymmetrical workloads."*

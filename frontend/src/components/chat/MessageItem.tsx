@@ -78,7 +78,7 @@ export function MessageItem({
     }
   }
 
-  // Uniform 1% -> 100% progressive ticker with asymptotic easing and 100% completion hold
+  // Uniform 1% -> 100% progressive ticker with stage-anchored pacing and asymptotic velocity decay
   const [smoothPercent, setSmoothPercent] = useState<number>(1)
   const [hasFinished100, setHasFinished100] = useState<boolean>(false)
   const animFrameRef = useRef<number | null>(null)
@@ -93,19 +93,21 @@ export function MessageItem({
       return
     }
 
-    // Determine target percentage based on stage or content readiness
-    let target = 28
+    // Determine target percentage based on real backend pipeline stage
+    let target = 24
     const stage = pipelineStatus?.stage
 
     if (message.content && message.content.length > 0) {
       target = 100
     } else if (stage === "searching") {
-      target = 28
+      target = 24
     } else if (stage === "fusion") {
-      target = 52
+      target = 38
     } else if (stage === "reasoning") {
-      target = 92
-    } else if (stage === "validating" || stage === "complete") {
+      target = 88
+    } else if (stage === "validating") {
+      target = 96
+    } else if (stage === "complete") {
       target = 100
     }
 
@@ -117,8 +119,19 @@ export function MessageItem({
       const now = Date.now()
       const dt = now - lastTickTimeRef.current
 
-      // Tick update every ~30ms for smooth 1%, 2%, 3%... uniform progression
-      if (dt >= 30) {
+      // Calculate dynamic tick interval based on current progress & stage
+      // Paces Step 3 (LLM generation) across ~5-6s so it never freezes
+      let requiredInterval = 30
+      if (target === 100) {
+        requiredInterval = 20 // Rapid sweep when answer is ready
+      } else if (stage === "reasoning") {
+        if (smoothPercent < 50) requiredInterval = 35 // Quick ramp to 50%
+        else if (smoothPercent < 68) requiredInterval = 75 // Steady ramp to 68%
+        else if (smoothPercent < 82) requiredInterval = 160 // Easing ramp to 82%
+        else requiredInterval = 380 // Asymptotic creep to 88% while LLM thinks
+      }
+
+      if (dt >= requiredInterval) {
         lastTickTimeRef.current = now
 
         setSmoothPercent((prev) => {
@@ -132,12 +145,11 @@ export function MessageItem({
           }
 
           if (prev < target) {
-            // Standard uniform progress (+1 per tick)
             return prev + 1
           }
 
-          // Asymptotically creep while awaiting next stage so it never freezes
-          if (prev < 95 && Math.random() < 0.25) {
+          // In Step 3 (LLM reasoning), if backend takes >6s, gently creep (up to 92%) so ticker never looks frozen
+          if (stage === "reasoning" && prev < 92 && Math.random() < 0.2) {
             return prev + 1
           }
 
@@ -156,7 +168,7 @@ export function MessageItem({
         cancelAnimationFrame(animFrameRef.current)
       }
     }
-  }, [isStreamingLast, isUser, pipelineStatus?.stage, message.content])
+  }, [isStreamingLast, isUser, pipelineStatus?.stage, message.content, smoothPercent])
 
   // Hold at 100% for 250ms celebration before seamlessly revealing answer
   useEffect(() => {
@@ -168,24 +180,36 @@ export function MessageItem({
     }
   }, [smoothPercent, message.content])
 
-  // Compute dynamic label and 10-bar fill from uniform smoothPercent
+  // Compute stage-anchored label and 10-bar fill
+  // CRITICAL: Step labels strictly follow backend stage truth, eliminating state drift
   const progressInfo = useMemo(() => {
     const percent = Math.min(100, Math.max(1, Math.round(smoothPercent)))
     const filledBars = Math.min(10, Math.max(1, Math.ceil(percent / 10)))
 
+    const stage = pipelineStatus?.stage
     let label = "Step 1 of 4: Hybrid Retrieval"
-    if (percent >= 30 && percent < 55) {
+
+    if (stage === "searching") {
+      label = "Step 1 of 4: Hybrid Retrieval"
+    } else if (stage === "fusion") {
       label = "Step 2 of 4: Rank Fusion"
-    } else if (percent >= 55 && percent < 90) {
+    } else if (stage === "reasoning") {
+      // While in Step 3, ALWAYS display Step 3: Agent Synthesis regardless of %
       label = "Step 3 of 4: Agent Synthesis"
-    } else if (percent >= 90 && percent < 100) {
+    } else if (stage === "validating") {
       label = "Step 4 of 4: Grounding Verification"
-    } else if (percent >= 100) {
+    } else if (stage === "complete" || (message.content && percent >= 100)) {
       label = "Step 4 of 4: Verification Complete"
+    } else {
+      // Pure fallback if pipelineStatus has not yet arrived
+      if (percent < 25) label = "Step 1 of 4: Hybrid Retrieval"
+      else if (percent < 40) label = "Step 2 of 4: Rank Fusion"
+      else if (percent < 90) label = "Step 3 of 4: Agent Synthesis"
+      else label = "Step 4 of 4: Grounding Verification"
     }
 
     return { percent, label, filledBars }
-  }, [smoothPercent])
+  }, [smoothPercent, pipelineStatus?.stage, message.content])
 
   // Map citation_index to Citation object + parse inline source entries from text
   const citationMap = useMemo(() => {
