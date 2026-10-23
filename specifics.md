@@ -2289,3 +2289,26 @@ To deliver a smooth `1%, 2%, 3%, 4%... 100%` progress experience without floodin
 
 3. **Interview Takeaway**:
    *"Whenever you manipulate native browser history (`replaceState`) to bypass framework component unmounting in high-frequency streaming applications, you must establish an explicit Event-Driven Synchronization Bus (`CustomEvent`) between data-fetching hooks and navigational controls. Never gate user-intent actions (like 'New Thread') behind declarative router parameters that may have fallen out of sync with imperative window state."*
+
+---
+
+#### Question 20: How do React's reconciliation algorithm and key-driven remounting guarantee a 100% deterministic conversation reset on "New Research Thread", and why does 1-to-1 Model Fidelity matter in multi-model enterprise architectures?
+
+##### Institutional Engineering Answer:
+"In production fullstack AI architectures, two subtle issues commonly degrade user trust: **component state retention across route transitions** and **model alias desynchronization**.
+
+1. **Deterministic Component Resetting via React Keys**:
+   - In React, components of the same type rendered in the same DOM position (e.g. `<ChatArea />` rendered at both `/` and `/chat/:threadId`) are preserved across re-renders to optimize performance.
+   - However, when starting a new conversation, preserving component instances creates state leaks: in-flight reader buffers, turn version maps, and citation sheets linger in memory.
+   - **The Solution**: In [`ChatPage.tsx`](frontend/src/pages/ChatPage.tsx), we bind `<ChatArea />` to an explicit dynamic key:
+     ```typescript
+     const areaKey = threadId ? `thread-${threadId}` : `draft-${draftSessionId}`;
+     return <ChatArea key={areaKey} threadId={threadId} />;
+     ```
+   - When '+ New Research Thread' is clicked, `meridian_reset_to_draft` updates `draftSessionId = Date.now()`.
+   - Because the `key` changes, React’s reconciliation algorithm treats the existing `<ChatArea />` as discarded, destroys its fiber node, purges all local message and turn state, and mounts a fresh, pristine instance containing the rotating starter prompt cards.
+
+2. **1-to-1 Model Fidelity (Eliminating Alias Deception)**:
+   - When users select `Gemini 2.0 Flash` in the UI, mapping it under the hood to `gemini-3-flash-preview` in a backend dictionary causes a visual contradiction: the message header shows `✦ Gemini 2.0 Flash`, while the telemetry card and system prompt logs display `Gemini 3 Flash`.
+   - **Strict 1-to-1 Routing**: In [`backend/app/assistant/model.py`](backend/app/assistant/model.py), every user-facing model ID routes directly to its corresponding live Google AI Studio endpoint (`"gemini-2.0-flash": "gemini-2.0-flash"`).
+   - The **2D Waterfall Failover** is reserved strictly for genuine runtime `HTTP 429` quota exhaustion events, at which point an explicit `Auto-Routed: [Model A] → [Model B]` telemetry frame is streamed to the analyst. This preserves complete transparency and verifiable model provenance across institutional research sessions."
