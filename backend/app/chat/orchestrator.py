@@ -553,14 +553,26 @@ def _is_low_information_greeting(text: str) -> bool:
     words = clean.split()
     if not words:
         return True
-    greeting_words = {
-        "hi", "hello", "hey", "howdy", "greetings", "good", "morning", "afternoon", "evening",
-        "day", "there", "how", "are", "you", "doing", "yo", "sup", "whatsup", "test", "ok",
-        "okay", "bye", "goodbye", "thanks", "thank", "all", "got", "it", "understood",
-        "makes", "sense", "no", "that", "thats", "now", "fine", "great"
+
+    # 1. Direct greeting starters (e.g. "hi bud", "hey bro", "hello there", "good morning")
+    greeting_starters = {
+        "hi", "hello", "hey", "howdy", "greetings", "yo", "sup", "whatsup"
     }
-    if len(words) <= 6 and all(w in greeting_words for w in words):
+    if len(words) <= 8 and (words[0] in greeting_starters or any(w in greeting_starters for w in words[:2])):
         return True
+
+    # 2. Conversational pleasantries, banter, testing, or departure statements
+    casual_words = {
+        "hi", "hello", "hey", "howdy", "greetings", "good", "morning", "afternoon", "evening",
+        "day", "there", "how", "are", "you", "doing", "yo", "sup", "whatsup", "test", "testing",
+        "ok", "okay", "bye", "goodbye", "night", "sleep", "thanks", "thank", "all", "got", "it",
+        "understood", "makes", "sense", "no", "that", "thats", "now", "fine", "great", "cool",
+        "leave", "bud", "buddy", "bro", "dude", "mate", "friend", "man", "sir", "yes", "yeah", "yep"
+    }
+    filler_words = {"i", "to", "have", "a", "the", "you", "how", "are", "is", "doing", "it", "me", "my", "we"}
+    if len(words) <= 8 and all(w in casual_words or w in filler_words for w in words):
+        return True
+
     return False
 
 
@@ -570,7 +582,7 @@ async def maybe_generate_thread_title(
     user_content: str,
     model_name: str | None = None,
 ) -> str | None:
-    """Generate a crisp 3-5 word title for untitled or greeting-titled threads using fast LLM summarization."""
+    """Generate a crisp 3-5 word title for untitled or greeting-titled threads using fast LLM summarization with semantic gating."""
     try:
         thread = get_thread(client, thread_id)
         if not thread:
@@ -581,20 +593,22 @@ async def maybe_generate_thread_title(
             not current_title
             or current_title in ("", "Untitled Analysis", "Untitled Thread", "New Thread")
             or _is_low_information_greeting(current_title)
+            or any(
+                current_title.lower().startswith(p)
+                for p in (
+                    "hi", "hello", "hey", "howdy", "yo", "sup", "greetings",
+                    "good morning", "good evening", "good afternoon", "ok", "okay", "test"
+                )
+            )
         )
 
         if not is_placeholder_or_greeting:
             return None
 
-        # Defer titling if the user prompt itself is just a casual greeting without financial topic.
-        # Leaves the thread as "Untitled Analysis" until the first substantive query arrives.
+        # Fast pre-check: If user prompt is an obvious greeting or casual banter, defer titling immediately
         if _is_low_information_greeting(user_content):
             logger.info("Deferred title generation for greeting query: '%s'", user_content)
             return None
-
-        fallback_title = user_content.strip()[:40].strip()
-        if len(user_content.strip()) > 40:
-            fallback_title = fallback_title.rsplit(" ", 1)[0] + "..."
 
         try:
             model = get_llm_model(model_name)
@@ -603,20 +617,29 @@ async def maybe_generate_thread_title(
                 output_type=str,
                 system_prompt=(
                     "You are an editor for an SEC equity research system. "
-                    "Summarize the user inquiry into a crisp 3 to 5 word conversation title. "
-                    "Focus on the company ticker or name and the core financial topic (e.g. 'Apple FY24 iPhone Sales', 'AWS Margins & GenAI'). "
-                    "Do NOT use quotation marks, punctuation, or generic filler words like 'Analysis of', 'Question about'. "
-                    "Output ONLY the 3-5 word title."
+                    "Analyze the user's message to synthesize a concise, professional conversation title.\n\n"
+                    "RULES:\n"
+                    "1. If the message is a greeting, conversational banter, test, or does NOT ask a substantive question "
+                    "(e.g. 'hi bud', 'hey', 'hello there', 'how are you', 'ok leave it i have to sleep', 'test', 'bye', 'thanks'), "
+                    "output EXACTLY: UNTITLED\n"
+                    "2. If the message asks a substantive financial or research question, synthesize a crisp 3 to 5 word title "
+                    "focusing on the company ticker/name and core topic (e.g. 'Amazon FY24 Net Sales', 'Apple Services Gross Margin', 'Nvidia Data Center Growth').\n"
+                    "3. Do NOT use quotation marks, punctuation, or generic filler words like 'Analysis of', 'Question about'.\n"
+                    "4. Output ONLY the 3-5 word title or UNTITLED."
                 ),
             )
             res = await title_agent.run(user_content)
             raw = res.output.strip().strip('"').strip("'").strip()
             clean_title = (raw.splitlines()[0] if raw.splitlines() else raw).strip(".").strip()[:50]
-            if len(clean_title) < 3:
-                clean_title = fallback_title
+
+            # LLM Semantic Gate: If the LLM deemed it conversational banter, defer titling
+            if not clean_title or clean_title.upper() == "UNTITLED" or clean_title.upper().startswith("UNTITLED"):
+                logger.info("LLM semantic gate classified query as non-substantive: '%s'", user_content)
+                return None
+
         except Exception as e:
-            logger.warning("LLM title generation failed, using fallback: %s", e)
-            clean_title = fallback_title
+            logger.warning("LLM title generation failed: %s", e)
+            return None
 
         update_thread(client, thread_id, title=clean_title)
         logger.info("Auto-named thread %s to '%s'", thread_id, clean_title)

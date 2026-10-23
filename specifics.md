@@ -1177,11 +1177,28 @@ Communication between the React client and FastAPI backend uses **Server-Sent Ev
   - Eliminates "ghost conversation" database pollution: zero empty rows are inserted into PostgreSQL if an analyst merely browses or clicks new thread without submitting an inquiry.
   - When the analyst submits their initial prompt, thread creation executes on the fly in the background, assigns the prompt title, updates the browser address bar via `window.history.replaceState`, dispatches a `meridian_thread_created` event to the sidebar, and streams the answer into the newly registered thread without interrupting or remounting the stream.
   - Decoupled thread list fetching in `Sidebar.tsx` from `activeThreadId` to eliminate the multi-endpoint refetch storm upon navigation, and transitioned FastAPI's `create_thread` endpoint to synchronous `def` so blocking PostgREST I/O runs in an external threadpool rather than freezing Python's asyncio event loop.
-  - **Deferred & Upgradable Thread Titling Engine (`useChatStream.ts`, `orchestrator.py: maybe_generate_thread_title`)**:
-    - **The "Title Lock-In" Problem**: In standard conversational systems, if an analyst begins a thread by saying *"hi"* or *"hi how are you"*, the system eagerly titles the thread *"hi"*. Because the thread is considered "already named", subsequent substantive inquiries (e.g., *"What were Google's Traffic Acquisition Costs in 2024?"*) are ignored, leaving the research thread permanently mislabeled as *"hi"*.
-    - **Intent-Aware Greeting Detection**: On draft creation in `useChatStream.ts`, low-information pleasantries (e.g. *"hi"*, *"hello"*, *"hey"*, *"good morning"*) are detected via set-based word classification and initialized as `"Untitled Analysis"` rather than locking in a greeting string.
-    - **First-Question Auto-Upgrade**: In `maybe_generate_thread_title`, the backend explicitly defers LLM title generation on greeting prompts. When the analyst asks their first actual financial question in Turn 2, the engine detects that the thread is untitled or greeting-named, synthesizes a crisp 3–5 word title (e.g. *"Alphabet FY24 TAC Analysis"*), persists it to PostgreSQL, and streams a `2:[{"type": "thread_title", "title": "..."}]` SSE event.
-    - **Real-Time Sidebar Mutation**: `Sidebar.tsx` listens to the `thread_title_updated` custom event and instantly morphs the thread item in the sidebar from *"Untitled Analysis"* to the newly synthesized research title in real time.
+  - **Decoupled Frontend & LLM Semantic Title Gate (`useChatStream.ts`, `orchestrator.py: maybe_generate_thread_title`)**:
+    - **The "Title Lock-In" Problem**: In standard conversational systems, if an analyst begins a thread by saying *"hi"* or *"hi bud"*, the system eagerly titles the thread after that initial message. Because the thread is considered "already named", subsequent substantive inquiries (e.g., *"what is amazon's net sales in 2024"*) are ignored, leaving the research thread permanently mislabeled as *"hi bud"*.
+    - **The "Whack-a-Mole" Antipattern of Static Whitelists**:
+      - Earlier implementations attempted to solve this with a hardcoded static set of greeting words (e.g. `Set(["hi", "hello", "hey", ...])`).
+      - In production, static whitelists fail immediately when faced with natural human language: casual slang (*"hi bud"*, *"hey bro"*, *"yo mate"*), conversational departures (*"ok leave it i have to sleep"*), or polite openers (*"can you help me"*) fail the strict whitelist check. The frontend misclassifies them as substantive research topics, persists them to Supabase, and locks the thread permanently.
+    - **The Engineering Solution: Clean Frontend Decoupling + LLM Semantic Gate**:
+      1. **Frontend Decoupling (`useChatStream.ts`)**: The frontend is completely relieved of NLP guesswork. When an analyst submits a prompt in a brand-new draft thread, the client **always** initializes the database record with the placeholder title `"Untitled Analysis"`. The frontend never truncates or guesses titles from raw user text.
+      2. **Backend LLM Semantic Gate (`orchestrator.py`)**:
+         - In the background, `maybe_generate_thread_title` prompts Google Gemini (via `title_agent`) with strict semantic gating directives:
+           ```text
+           RULES:
+           1. If the message is a greeting, conversational banter, test, or does NOT ask a substantive question 
+              (e.g. 'hi bud', 'hey', 'hello there', 'ok leave it i have to sleep', 'test', 'bye', 'thanks'), 
+              output EXACTLY: UNTITLED
+           2. If the message asks a substantive financial question, synthesize a crisp 3 to 5 word title 
+              focusing on the company and core financial topic (e.g. 'Amazon FY24 Net Sales', 'Apple Services Gross Margin').
+           ```
+         - If the analyst sends greetings or conversational chatter (*"hi bud"*, *"ok leave it i have to sleep"*), Gemini outputs `UNTITLED`. The backend detects this and defers titling, leaving the thread as `"Untitled Analysis"`.
+         - When the analyst submits their first substantive financial question (*"what is amazon's net sales in 2024"*), Gemini synthesizes `"Amazon FY24 Net Sales"`.
+         - The backend updates PostgreSQL Supabase via `update_thread`, and streams an SSE event: `2:[{"type": "thread_title", "threadId": "...", "title": "Amazon FY24 Net Sales"}]`.
+      3. **Real-Time Sidebar Mutation**: `Sidebar.tsx` intercepts the `thread_title_updated` event and seamlessly morphs the thread item in the sidebar from *"Untitled Analysis"* to the newly synthesized research title in real time.
+      4. **Retroactive Upgrade Circuit for Legacy Threads**: In `maybe_generate_thread_title`, threads whose existing title starts with conversational prefixes (such as legacy threads named *"hi bud"* or *"hi how are you"*) are flagged as upgradeable placeholders, guaranteeing that sending a subsequent financial query will automatically overwrite the greeting with the true research title.
   - **0ms Instant Optimistic UI Mounting Architecture vs. Sequential Blocking Antipattern (`useChatStream.ts`)**:
     - **The Diagnostic: Root Cause of the 1–2 Second Blank Viewport**:
       - *The Symptom*: In established research threads, pressing Enter yielded an instantaneous (sub-16ms) UI response with immediate chat bubble rendering and live streaming telemetry ("fast as fuck"). However, in a brand-new research thread, submitting the initial inquiry triggered a jarring 1.0–2.0 second visual freeze where the input textarea cleared, the viewport went completely blank, and no user message, assistant bubble, or pipeline status appeared until several seconds later.

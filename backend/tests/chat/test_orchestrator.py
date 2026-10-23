@@ -307,9 +307,12 @@ async def test_maybe_generate_thread_title_deferred_for_greetings() -> None:
 
     # 1. Unit check for greeting detector
     assert _is_low_information_greeting("hi") is True
+    assert _is_low_information_greeting("hi bud") is True
+    assert _is_low_information_greeting("hey bro") is True
     assert _is_low_information_greeting("hi how are you") is True
     assert _is_low_information_greeting("Hello there!") is True
     assert _is_low_information_greeting("good morning") is True
+    assert _is_low_information_greeting("ok leave it i have to sleep") is True
     assert _is_low_information_greeting("What was Microsoft Azure revenue in FY24?") is False
     assert _is_low_information_greeting("is it renaissance or rennaissance?") is False
 
