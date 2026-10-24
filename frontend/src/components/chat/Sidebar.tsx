@@ -620,7 +620,6 @@ export function Sidebar({
                               <span className="truncate">{t.title || "Untitled Analysis"}</span>
                             </div>
                             <div className="flex items-center gap-1.5 shrink-0">
-                              {t.is_pinned && <Pin className="size-3 text-muted-foreground" />}
                               <span className="text-[10px] text-muted-foreground font-mono">
                                 {formatRelativeTime(t.created_at || t.updated_at)}
                               </span>
@@ -771,7 +770,6 @@ export function Sidebar({
                           >
                             <span className="truncate min-w-0 flex-1">{t.title || "Untitled Analysis"}</span>
                             <div className="flex items-center gap-1 shrink-0 ml-1">
-                              {t.is_pinned && <Pin className="size-2.5 text-muted-foreground" />}
                               <span className="text-[10px] text-muted-foreground font-mono">
                                 {formatRelativeTime(t.created_at || t.updated_at)}
                               </span>
@@ -1230,12 +1228,8 @@ export function Sidebar({
           </span>
         </Link>
 
-        {/* Right-hand Action Area: Pinned icon, 3 dots menu, and active white dot */}
+        {/* Right-hand Action Area: 3 dots menu and active white dot */}
         <div className="flex shrink-0 items-center gap-1 ml-auto pl-1">
-          {thread.is_pinned && (
-            <Pin className="size-2.5 shrink-0 fill-current opacity-60 text-muted-foreground" />
-          )}
-
           <div className="relative flex size-6 shrink-0 items-center justify-center">
             {/* Thread Actions Dropdown Menu (Glitch-free popper anchor with solid charcoal styling) */}
             <DropdownMenu>
