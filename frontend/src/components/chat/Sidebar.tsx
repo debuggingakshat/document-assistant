@@ -108,6 +108,15 @@ export function Sidebar({
   const [editTitle, setEditTitle] = useState("")
   const [savingEdit, setSavingEdit] = useState(false)
   const [deletingThreadId, setDeletingThreadId] = useState<string | null>(null)
+  // Delete confirmation states (Big Tech pattern: ask every time vs never ask again)
+  const [threadPendingDelete, setThreadPendingDelete] = useState<Thread | null>(null)
+  const [dontAskAgainDelete, setDontAskAgainDelete] = useState<boolean>(false)
+  const [skipDeleteConfirm, setSkipDeleteConfirm] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("meridian_skip_delete_confirm") === "true"
+    }
+    return false
+  })
 
   // Archived dialog state
   const [showArchivedDialog, setShowArchivedDialog] = useState(false)
@@ -420,21 +429,47 @@ export function Sidebar({
     }
   }
 
-  async function handleDeleteThread(e: MouseEvent, threadId: string) {
+  function handleRequestDelete(e: MouseEvent, thread: Thread) {
     e.preventDefault()
     e.stopPropagation()
+
+    // If user previously selected "Don't ask again", bypass modal and perform 0ms instant delete
+    if (skipDeleteConfirm || localStorage.getItem("meridian_skip_delete_confirm") === "true") {
+      void executeOptimisticDelete(thread.id)
+      return
+    }
+
+    setThreadPendingDelete(thread)
+    setDontAskAgainDelete(false)
+  }
+
+  async function executeOptimisticDelete(threadId: string) {
     if (deletingThreadId) return
 
+    // 1. Snapshot previous state for instant rollback in case of network failure
+    const prevThreads = threads
+    const prevArchived = archivedThreads
+
+    // 2. 0ms Optimistic Eviction: Immediately remove from UI
+    setThreads((prev) => prev.filter((t) => t.id !== threadId))
+    setArchivedThreads((prev) => prev.filter((t) => t.id !== threadId))
+
+    // 3. If deleting currently active thread, immediately reset to fresh draft
+    if (effectiveActiveThreadId === threadId) {
+      navigate("/")
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("meridian_reset_to_draft"))
+      }
+    }
+
+    // 4. Background Server Deletion (async non-blocking)
     setDeletingThreadId(threadId)
     try {
       await deleteThread(threadId)
-      setThreads((prev) => prev.filter((t) => t.id !== threadId))
-      setArchivedThreads((prev) => prev.filter((t) => t.id !== threadId))
-      if (effectiveActiveThreadId === threadId) {
-        navigate("/")
-      }
     } catch {
-      // Failed to delete
+      // Rollback on network failure
+      setThreads(prevThreads)
+      setArchivedThreads(prevArchived)
     } finally {
       setDeletingThreadId(null)
     }
@@ -828,6 +863,28 @@ export function Sidebar({
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem
+                onClick={() => {
+                  const current = localStorage.getItem("meridian_skip_delete_confirm") === "true"
+                  if (current) {
+                    localStorage.removeItem("meridian_skip_delete_confirm")
+                    setSkipDeleteConfirm(false)
+                  } else {
+                    localStorage.setItem("meridian_skip_delete_confirm", "true")
+                    setSkipDeleteConfirm(true)
+                  }
+                }}
+                className="cursor-pointer gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-zinc-800 transition-colors hover:bg-zinc-100 dark:text-[#ececec] dark:hover:bg-[#2c2c2c]"
+              >
+                <Trash2 className="size-3.5 opacity-80" />
+                <div className="flex flex-1 items-center justify-between">
+                  <span>Confirm deletions</span>
+                  <span className="text-[10px] text-muted-foreground font-mono">
+                    {!skipDeleteConfirm ? "Always" : "Never"}
+                  </span>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator className="my-1 -mx-1 h-px bg-zinc-200 dark:bg-[#333333]" />
+              <DropdownMenuItem
                 onClick={() => void signOut()}
                 className="text-destructive focus:text-destructive"
               >
@@ -1129,7 +1186,7 @@ export function Sidebar({
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={(e) => void handleDeleteThread(e, thread.id)}
+                      onClick={(e) => handleRequestDelete(e, thread)}
                       className="h-7 px-2 text-[11px] text-destructive hover:bg-destructive/10"
                       title="Delete permanently"
                     >
@@ -1149,6 +1206,79 @@ export function Sidebar({
               className="w-full sm:w-auto text-xs"
             >
               Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Modal (Big Tech Pattern: Ask Every Time vs Never Ask Again) */}
+      <Dialog
+        open={!!threadPendingDelete}
+        onOpenChange={(open) => {
+          if (!open) setThreadPendingDelete(null)
+        }}
+      >
+        <DialogContent className="max-w-sm rounded-2xl p-5 border border-zinc-200 bg-white text-zinc-900 shadow-2xl dark:border-[#333333] dark:bg-[#1f1f1f] dark:text-[#ececec]">
+          <DialogHeader className="gap-1.5">
+            <div className="flex items-center gap-2">
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-red-500/10 text-red-600 dark:text-red-400">
+                <Trash2 className="size-4" />
+              </div>
+              <DialogTitle className="text-sm font-semibold">
+                Delete conversation?
+              </DialogTitle>
+            </div>
+            <DialogDescription className="text-xs text-muted-foreground pt-1 leading-relaxed">
+              Are you sure you want to delete{" "}
+              <span className="font-semibold text-foreground">
+                "{threadPendingDelete?.title || "Untitled Analysis"}"
+              </span>
+              ? This conversation and its verified citations will be permanently removed.
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* "Don't ask me again" Checkbox */}
+          <div className="my-2 rounded-xl border border-border/60 bg-muted/30 p-2.5 transition-colors hover:bg-muted/50">
+            <label className="flex items-center gap-2.5 text-xs text-muted-foreground cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={dontAskAgainDelete}
+                onChange={(e) => setDontAskAgainDelete(e.target.checked)}
+                className="size-4 rounded border-border accent-primary cursor-pointer"
+              />
+              <span className="font-medium text-foreground text-[11.5px]">
+                Don't ask me again on this device
+              </span>
+            </label>
+          </div>
+
+          <DialogFooter className="flex items-center gap-2 sm:justify-end pt-1">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setThreadPendingDelete(null)}
+              className="text-xs rounded-xl"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => {
+                if (!threadPendingDelete) return
+                const targetId = threadPendingDelete.id
+
+                if (dontAskAgainDelete) {
+                  localStorage.setItem("meridian_skip_delete_confirm", "true")
+                  setSkipDeleteConfirm(true)
+                }
+
+                setThreadPendingDelete(null)
+                void executeOptimisticDelete(targetId)
+              }}
+              className="text-xs rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium"
+            >
+              Delete
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1288,7 +1418,7 @@ export function Sidebar({
                 </DropdownMenuItem>
 
                 <DropdownMenuItem
-                  onClick={(e) => void handleDeleteThread(e, thread.id)}
+                  onClick={(e) => handleRequestDelete(e, thread)}
                   className="cursor-pointer gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-red-600 transition-colors hover:bg-red-500/10 hover:text-red-700 dark:text-[#ef4444] dark:hover:bg-red-500/15 dark:hover:text-[#f87171]"
                 >
                   <Trash2 className="size-3.5" />
