@@ -48,6 +48,7 @@ class MessageResponse(BaseModel):
     content: str
     created_at: datetime
     ai_sdk_metadata: dict[str, Any] | None = None
+    citations: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class ChatStreamRequest(BaseModel):

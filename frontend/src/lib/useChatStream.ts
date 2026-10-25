@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import {
   createThread,
-  listMessageCitations,
   listMessages,
   type Citation,
   type Message,
@@ -13,6 +12,9 @@ import { getAccessToken } from "@/lib/supabase"
 interface UseChatStreamOptions {
   threadId: string | undefined
 }
+
+// Global in-memory cache for 0ms instantaneous thread switching (Stale-While-Revalidate)
+const threadMessagesCache = new Map<string, Message[]>()
 
 export function useChatStream({ threadId }: UseChatStreamOptions) {
   const [messages, setMessages] = useState<Message[]>([])
@@ -28,6 +30,13 @@ export function useChatStream({ threadId }: UseChatStreamOptions) {
   useEffect(() => {
     setActiveThreadId(threadId)
   }, [threadId])
+
+  // Automatically keep in-memory cache fresh for instant switches
+  useEffect(() => {
+    if (activeThreadId && messages.length > 0) {
+      threadMessagesCache.set(activeThreadId, messages)
+    }
+  }, [activeThreadId, messages])
 
   // Universal reset listener: when user clicks "New Research Thread", clear all session state
   useEffect(() => {
@@ -65,33 +74,25 @@ export function useChatStream({ threadId }: UseChatStreamOptions) {
       return
     }
 
+    // 0ms Cache Hit: If previously opened in this session, display immediately without skeleton!
+    const cached = threadMessagesCache.get(threadId)
+    if (cached && cached.length > 0) {
+      setMessages(cached)
+      setIsLoading(false)
+    } else {
+      setIsLoading(true)
+    }
+
     let isMounted = true
-    setIsLoading(true)
 
+    // Citations are now directly embedded in the single backend payload (N+1 cascade eliminated)
     listMessages(threadId)
-      .then(async (history) => {
+      .then((history) => {
         if (!isMounted) return
-
-        // For assistant messages, load stored citations if available
-        const enriched = await Promise.all(
-          history.map(async (msg) => {
-            if (msg.role === "assistant") {
-              try {
-                const cits = await listMessageCitations(msg.id)
-                return { ...msg, citations: cits }
-              } catch {
-                return msg
-              }
-            }
-            return msg
-          })
-        )
-
-        if (isMounted) {
-          setMessages(enriched)
-          setIsLoading(false)
-          setError(null)
-        }
+        threadMessagesCache.set(threadId, history)
+        setMessages(history)
+        setIsLoading(false)
+        setError(null)
       })
       .catch((err) => {
         if (isMounted) {

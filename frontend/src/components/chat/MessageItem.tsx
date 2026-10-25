@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { memo, useEffect, useMemo, useRef, useState } from "react"
 import {
   AlertTriangle,
   Check,
@@ -38,7 +38,7 @@ interface MessageItemProps {
   onSelectCitation?: (citation: Citation) => void
 }
 
-export function MessageItem({
+export const MessageItem = memo(function MessageItem({
   message,
   isStreaming,
   isStreamingLast,
@@ -912,4 +912,4 @@ export function MessageItem({
       )}
     </div>
   )
-}
+})

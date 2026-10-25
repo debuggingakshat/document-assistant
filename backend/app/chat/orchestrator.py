@@ -395,6 +395,35 @@ async def _run_agent_with_failover(
     raise RuntimeError("All models and keys exhausted in failover waterfall")
 
 
+async def _execute_retrieval(
+    retriever: Any,
+    query: str,
+    ticker: str | None,
+    fiscal_year: int | None,
+    top_n: int = 5,
+    expand_neighbors: bool = True,
+) -> list[Any]:
+    """Execute retrieval asynchronously if supported to keep event loop free, with sync fallback for test mocks."""
+    if hasattr(retriever, "retrieve_async"):
+        res = retriever.retrieve_async(
+            query=query,
+            ticker=ticker,
+            fiscal_year=fiscal_year,
+            top_n=top_n,
+            expand_neighbors=expand_neighbors,
+        )
+        if asyncio.iscoroutine(res) or hasattr(res, "__await__"):
+            return await res
+        if isinstance(res, list):
+            return res
+    return retriever.retrieve(
+        query=query,
+        ticker=ticker,
+        fiscal_year=fiscal_year,
+        top_n=top_n,
+        expand_neighbors=expand_neighbors,
+    )
+
 async def orchestrate_turn(
     client: Client,
     thread_id: uuid.UUID,
@@ -456,7 +485,8 @@ async def orchestrate_turn(
             ticker,
             fiscal_year,
         )
-        initial_passages = retriever.retrieve(
+        initial_passages = await _execute_retrieval(
+            retriever=retriever,
             query=retrieval_query,
             ticker=ticker,
             fiscal_year=fiscal_year,
@@ -777,7 +807,8 @@ async def stream_orchestrated_turn(
             fiscal_year,
             len(prior_messages),
         )
-        initial_passages = retriever.retrieve(
+        initial_passages = await _execute_retrieval(
+            retriever=retriever,
             query=retrieval_query,
             ticker=ticker,
             fiscal_year=fiscal_year,
@@ -999,12 +1030,12 @@ async def stream_orchestrated_turn(
                 "protocol": "Vercel AI SDK SSE Data Stream",
             },
         )
-    # 7. Stream text response tokens
+    # 7. Stream text response tokens with accelerated fluid sweep (sub-second delivery)
     words = final_answer_text.split(" ")
     for i, word in enumerate(words):
         chunk = word + (" " if i < len(words) - 1 else "")
         yield format_ai_sdk_text_part(chunk)
-        await asyncio.sleep(0.01)
+        await asyncio.sleep(0.002)
 
     # 8. Yield enriched citation metadata part for UI drawer & badges
     if saved_citations:

@@ -102,16 +102,30 @@ def delete_thread(client: Client, thread_id: uuid.UUID) -> None:
     client.table("chat_threads").delete().eq("id", str(thread_id)).execute()
 
 
-def list_messages(client: Client, thread_id: uuid.UUID) -> list[dict[str, Any]]:
-    """List all messages in a thread in chronological order."""
+def list_messages(
+    client: Client,
+    thread_id: uuid.UUID,
+    include_citations: bool = True,
+) -> list[dict[str, Any]]:
+    """List all messages in a thread in chronological order, with relational embedded citations."""
+    select_query = "*, message_citations(*)" if include_citations else "*"
     response = (
         client.table("chat_messages")
-        .select("*")
+        .select(select_query)
         .eq("thread_id", str(thread_id))
         .order("created_at", desc=False)
         .execute()
     )
-    return response.data if response else None or []
+    data = response.data if response else None or []
+    if include_citations:
+        for m in data:
+            raw_cits = m.pop("message_citations", []) or []
+            for c in raw_cits:
+                if not c.get("snippet") and c.get("excerpt"):
+                    c["snippet"] = c["excerpt"]
+            raw_cits.sort(key=lambda x: x.get("citation_index", 0))
+            m["citations"] = raw_cits
+    return data
 
 
 def save_message(
