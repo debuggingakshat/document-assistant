@@ -627,6 +627,7 @@ export function ChatArea({ threadId }: ChatAreaProps) {
                           isStreaming &&
                           activeAssistantMsg.id === messages[messages.length - 1]?.id
                         }
+                        isLatestAssistantTurn={idx === turns.length - 1}
                         pipelineStatus={
                           isStreaming &&
                           activeAssistantMsg.id === messages[messages.length - 1]?.id

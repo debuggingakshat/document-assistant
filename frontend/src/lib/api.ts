@@ -51,6 +51,7 @@ export interface Message {
   created_at: string
   citations?: Citation[]
   ai_sdk_metadata?: Record<string, any>
+  suggested_followups?: string[]
 }
 
 export interface PipelineStatus {

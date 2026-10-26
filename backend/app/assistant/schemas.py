@@ -42,3 +42,7 @@ class GroundedAnswer(BaseModel):
         default=None,
         description="Set if the request was refused due to scope (e.g. stock trading advice, non-coverage entity, or non-financial domain topic). Leave None for corporate finance definitions.",
     )
+    suggested_followups: list[str] = Field(
+        default_factory=list,
+        description="Exactly 3 concise, highly substantive follow-up research questions an equity research analyst would ask next based on this disclosure and filings.",
+    )

@@ -6,10 +6,12 @@ import {
   ChevronRight,
   Clock,
   Copy,
+  CornerDownLeft,
   ExternalLink,
   FileSpreadsheet,
   RotateCw,
   ShieldCheck,
+  Sparkles,
   User,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -28,6 +30,7 @@ interface MessageItemProps {
   message: Message
   isStreaming?: boolean
   isStreamingLast?: boolean
+  isLatestAssistantTurn?: boolean
   versions?: Message[]
   currentVersionIndex?: number
   onSelectVersion?: (index: number) => void
@@ -42,6 +45,7 @@ export const MessageItem = memo(function MessageItem({
   message,
   isStreaming,
   isStreamingLast,
+  isLatestAssistantTurn,
   versions,
   currentVersionIndex = 0,
   onSelectVersion,
@@ -53,6 +57,7 @@ export const MessageItem = memo(function MessageItem({
 }: MessageItemProps) {
   const isUser = message.role === "user"
   const [copied, setCopied] = useState(false)
+  const [loadedPrompt, setLoadedPrompt] = useState<string | null>(null)
 
   const modelBadge = useMemo(() => {
     const raw = message.ai_sdk_metadata?.model
@@ -830,6 +835,78 @@ export const MessageItem = memo(function MessageItem({
               </div>
             </div>
           )}
+
+          {/* Dynamic Contextual Follow-Up Chips ("Smart Research Prompts") */}
+          {!isUser &&
+            isLatestAssistantTurn &&
+            !isStreamingLast &&
+            message.suggested_followups &&
+            message.suggested_followups.length > 0 && (
+              <div className="mt-3.5 pt-3 border-t border-border/50">
+                <div className="flex items-center justify-between mb-2 select-none">
+                  <div className="flex items-center gap-1.5 text-[10.5px] font-semibold text-muted-foreground uppercase tracking-wider font-mono">
+                    <Sparkles className="size-3 text-primary animate-pulse" />
+                    <span>Suggested Follow-Ups</span>
+                  </div>
+                  <span className="text-[10px] text-muted-foreground/60 font-sans">
+                    Click to load in editor
+                  </span>
+                </div>
+
+                <div className="flex flex-col gap-1.5 sm:flex-row sm:flex-wrap">
+                  {message.suggested_followups.map((promptText, pIdx) => {
+                    const isLoaded = loadedPrompt === promptText
+                    return (
+                      <button
+                        key={pIdx}
+                        type="button"
+                        onClick={() => {
+                          window.dispatchEvent(
+                            new CustomEvent("meridian_populate_input", {
+                              detail: { text: promptText },
+                            })
+                          )
+                          setLoadedPrompt(promptText)
+                          setTimeout(() => {
+                            setLoadedPrompt((curr) => (curr === promptText ? null : curr))
+                          }, 2000)
+                        }}
+                        className={cn(
+                          "group relative flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left text-xs transition-all cursor-pointer shadow-2xs",
+                          isLoaded
+                            ? "border-primary bg-primary/10 text-primary font-medium"
+                            : "border-border/70 bg-muted/30 text-foreground/90 hover:border-foreground/30 hover:bg-muted/70 hover:shadow-xs active:scale-[0.99]"
+                        )}
+                        title="Click to populate query in editor"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Sparkles
+                            className={cn(
+                              "size-3 shrink-0 transition-transform group-hover:scale-110",
+                              isLoaded ? "text-primary" : "text-muted-foreground/70"
+                            )}
+                          />
+                          <span className="line-clamp-2 leading-snug">
+                            {promptText}
+                          </span>
+                        </div>
+
+                        <div className="shrink-0 flex items-center ml-1">
+                          {isLoaded ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-mono text-primary font-semibold">
+                              <Check className="size-3" />
+                              <span>Loaded</span>
+                            </span>
+                          ) : (
+                            <CornerDownLeft className="size-3 text-muted-foreground/50 transition-colors group-hover:text-foreground" />
+                          )}
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
         </div>
 
         {/* Assistant Message Actions & Footer Timestamp (Below the answer box) */}

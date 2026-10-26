@@ -2401,3 +2401,44 @@ To deliver a smooth `1%, 2%, 3%, 4%... 100%` progress experience without floodin
 4. **React Component Memoization & Vendor Chunk Splitting**:
    - In [`MessageItem.tsx`](frontend/src/components/chat/MessageItem.tsx), wrapped the component in `React.memo` to eliminate over 4,000 redundant virtual DOM re-renders of prior messages during streaming.
    - In [`vite.config.ts`](frontend/vite.config.ts), configured Rollup manual chunking (`vendor`, `icons`), reducing the main application bundle from **759 kB down to 472 kB (128 kB gzipped)** for lightning-fast initial load times."
+---
+
+#### Question 24: How do we architect Dynamic Contextual Follow-Up Chips ("Smart Research Prompts") with Zero Added LLM Latency, Single-Pass Pydantic Schemas, and Tactile Editor Handoff?
+
+##### Institutional Engineering Answer:
+"In modern generative AI platforms, dynamic follow-up suggestions significantly accelerate exploratory workflows. However, naive implementations introduce latency penalties, visual clutter, and rigid user interactions.
+
+1. **The Latency Trap of Naive Follow-Up Generators**:
+   - **The Anti-Pattern**: Many platforms execute a secondary LLM request after the assistant finishes generating its answer (e.g., `POST /generate-followups`), passing the conversation history to formulate 3 follow-up questions.
+   - **The Performance Cost**: This pattern incurs an additional 1.5 to 3.0 seconds of latency, doubles API request volume, consumes scarce rate-limit quota (e.g. Google AI Studio 15–20 RPD caps on preview tiers), and causes visible layout shifts long after the user has finished reading.
+   - **The Zero-Added-Latency Solution**: We embed `suggested_followups` directly into the primary Pydantic structured output model:
+     ```python
+     class GroundedAnswer(BaseModel):
+         answer: str
+         citations: list[CitationItem] = Field(default_factory=list)
+         has_sufficient_evidence: bool = True
+         refusal_reason: str | None = None
+         suggested_followups: list[str] = Field(
+             default_factory=list,
+             description="Exactly 3 concise, highly substantive follow-up research questions an equity research analyst would ask next based on this disclosure and filings.",
+         )
+     ```
+     Because Gemini outputs the structured JSON in a single inference pass, the follow-up research prompts are synthesized **concurrently with the answer at 0.00 seconds of added wall-clock latency**.
+
+2. **Option B Editor Handoff vs. Forced Instant Submit**:
+   - **The Analyst Workflow Constraint**: In consumer chat apps, clicking a prompt pill often triggers an immediate, unalterable message send. In institutional equity research, forcing an instant submit is anti-analyst: researchers frequently need to customize fiscal years, adjust ticker symbols, or refine financial metrics before firing a 10-K query.
+   - **Tactile Editor Population (Option B)**:
+     - When an analyst clicks a follow-up chip, a decoupled custom event `meridian_populate_input` is dispatched containing the prompt text.
+     - [`MessageInput.tsx`](frontend/src/components/chat/MessageInput.tsx) receives the payload, sets the input state, auto-grows the textarea to match `scrollHeight`, and focuses the textarea with the selection cursor placed at the end (`setSelectionRange(len, len)`).
+     - The clicked chip provides immediate tactile confirmation (`✦ Loaded in editor` / `✓ Loaded`), giving the analyst complete freedom to either press `Enter` for immediate submission or fine-tune their prompt.
+
+3. **Display Scope Discipline (Latest Turn Invariant)**:
+   - Showing follow-up prompt chips across every historical turn turns long conversation transcripts into noisy, cluttered walls of buttons.
+   - By calculating `isLatestAssistantTurn={turnIndex === turns.length - 1 && !isStreaming}` in [`ChatArea.tsx`](frontend/src/components/chat/ChatArea.tsx) and passing it to [`MessageItem.tsx`](frontend/src/components/chat/MessageItem.tsx), the chips render exclusively on the newest assistant response once streaming is complete. Past turns remain clean, readable, and focused on verified SEC citations.
+
+4. **SSE Event Streaming & Relational Persistence**:
+   - In [`orchestrator.py`](backend/app/chat/orchestrator.py), the follow-up suggestions are yielded over the Server-Sent Events stream as a typed data part:
+     ```python
+     yield f"2:[{json.dumps({'type': 'suggested_followups', 'messageId': str(asst_msg_id), 'suggestions': followup_suggestions})}]\n"
+     ```
+   - Concurrently, they are persisted into Supabase `chat_messages.ai_sdk_metadata['suggested_followups']`. When threads are reloaded or retrieved via Stale-While-Revalidate caching, [`useChatStream.ts`](frontend/src/lib/useChatStream.ts) reconstitutes the suggestions instantly without redundant network calls."

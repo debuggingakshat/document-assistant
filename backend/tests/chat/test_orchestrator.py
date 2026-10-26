@@ -550,3 +550,55 @@ async def test_stream_mixed_query_microsoft_and_inflation() -> None:
     assert '2:[{"type": "citations"' in full_stream
     assert "MSFT" in full_stream
     assert 'd:{"finishReason": "stop"' in full_stream
+
+
+@pytest.mark.anyio
+async def test_stream_orchestrated_turn_yields_suggested_followups() -> None:
+    """Verifies that suggested_followups in GroundedAnswer are yielded via SSE and stored in metadata."""
+    thread_id = uuid.uuid4()
+    mock_client = MagicMock()
+    mock_client.table().select().eq().order().execute.return_value = MagicMock(data=[])
+    mock_user_msg = {"id": str(uuid.uuid4())}
+    mock_asst_msg = {"id": str(uuid.uuid4())}
+    mock_client.table().insert().execute.side_effect = [
+        MagicMock(data=[mock_user_msg]),
+        MagicMock(data=[mock_asst_msg]),
+    ]
+
+    mock_retriever = MagicMock()
+    mock_retriever.retrieve.return_value = []
+
+    expected_followups = [
+        "What were Microsoft's Cloud gross margins in FY2024?",
+        "How did Azure CapEx compare to Google Cloud in 2024?",
+        "What was the total Remaining Performance Obligation (RPO)?",
+    ]
+
+    mock_agent = MagicMock()
+    test_answer = GroundedAnswer(
+        answer="Microsoft Cloud revenue grew 23% in fiscal year 2024.",
+        citations=[],
+        has_sufficient_evidence=True,
+        suggested_followups=expected_followups,
+    )
+    mock_agent_result = MagicMock()
+    mock_agent_result.output = test_answer
+    mock_agent.run = AsyncMock(return_value=mock_agent_result)
+
+    chunks = []
+    async for s in stream_orchestrated_turn(
+        client=mock_client,
+        thread_id=thread_id,
+        user_content="What was Microsoft Cloud revenue in 2024?",
+        retriever=mock_retriever,
+        agent_override=mock_agent,
+    ):
+        chunks.append(s)
+
+    full_stream = "".join(chunks)
+
+    # Verify suggested_followups SSE event is yielded
+    assert '2:[{"type": "suggested_followups"' in full_stream
+    assert expected_followups[0] in full_stream
+    assert expected_followups[1] in full_stream
+    assert expected_followups[2] in full_stream

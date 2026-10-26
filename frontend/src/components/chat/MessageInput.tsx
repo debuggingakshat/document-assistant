@@ -70,6 +70,31 @@ export function MessageInput({ onSend, disabled }: MessageInputProps) {
     el.style.height = `${Math.max(nextHeight, 36)}px`
   }, [input])
 
+  // Listen for smart research prompt chip clicks (Option B: Populate & Edit Editor)
+  useEffect(() => {
+    function handlePopulateInput(e: Event) {
+      const customEvent = e as CustomEvent<{ text: string }>
+      const newText = customEvent.detail?.text || ""
+      if (!newText) return
+      setInput(newText)
+      setTimeout(() => {
+        const el = textareaRef.current
+        if (el) {
+          el.focus()
+          el.setSelectionRange(newText.length, newText.length)
+          el.style.height = "auto"
+          const nextHeight = Math.min(el.scrollHeight, 140)
+          el.style.height = `${Math.max(nextHeight, 36)}px`
+        }
+      }, 50)
+    }
+
+    window.addEventListener("meridian_populate_input", handlePopulateInput)
+    return () => {
+      window.removeEventListener("meridian_populate_input", handlePopulateInput)
+    }
+  }, [])
+
   function handleSubmit(e?: FormEvent) {
     if (e) e.preventDefault()
     const trimmed = input.trim()

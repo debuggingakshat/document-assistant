@@ -524,7 +524,11 @@ async def orchestrate_turn(
         final_answer_text += warning_msg
 
     # 5. Persist assistant message with model & parent linkage
-    asst_metadata: dict[str, Any] = {"model": actual_model_used}
+    followup_suggestions = getattr(grounded_answer, "suggested_followups", []) or []
+    asst_metadata: dict[str, Any] = {
+        "model": actual_model_used,
+        "suggested_followups": followup_suggestions,
+    }
     if parent_user_message_id:
         asst_metadata["parent_user_message_id"] = str(parent_user_message_id)
 
@@ -964,7 +968,11 @@ async def stream_orchestrated_turn(
         final_answer_text += warning_msg
 
     # 5. Persist assistant message with model & parent linkage
-    asst_metadata: dict[str, Any] = {"model": actual_model_used}
+    followup_suggestions = getattr(grounded_answer, "suggested_followups", []) or []
+    asst_metadata: dict[str, Any] = {
+        "model": actual_model_used,
+        "suggested_followups": followup_suggestions,
+    }
     if parent_user_message_id:
         asst_metadata["parent_user_message_id"] = str(parent_user_message_id)
 
@@ -1091,6 +1099,15 @@ async def stream_orchestrated_turn(
                 yield f"2:[{json.dumps(title_payload)}]" + chr(10)
         except Exception:
             pass
+
+    # 9.5 Yield suggested follow-up prompts
+    if followup_suggestions:
+        followup_payload = {
+            "type": "suggested_followups",
+            "messageId": str(asst_msg_id),
+            "suggestions": followup_suggestions,
+        }
+        yield f"2:[{json.dumps(followup_payload)}]" + chr(10)
 
     # 10. Finish stream
     yield format_ai_sdk_finish_part()

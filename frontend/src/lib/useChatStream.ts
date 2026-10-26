@@ -89,8 +89,16 @@ export function useChatStream({ threadId }: UseChatStreamOptions) {
     listMessages(threadId)
       .then((history) => {
         if (!isMounted) return
-        threadMessagesCache.set(threadId, history)
-        setMessages(history)
+        const enrichedHistory = history.map((msg) => ({
+          ...msg,
+          suggested_followups:
+            msg.suggested_followups ||
+            (Array.isArray(msg.ai_sdk_metadata?.suggested_followups)
+              ? (msg.ai_sdk_metadata.suggested_followups as string[])
+              : []),
+        }))
+        threadMessagesCache.set(threadId, enrichedHistory)
+        setMessages(enrichedHistory)
         setIsLoading(false)
         setError(null)
       })
@@ -136,6 +144,7 @@ export function useChatStream({ threadId }: UseChatStreamOptions) {
         content: "",
         created_at: new Date().toISOString(),
         citations: [],
+        suggested_followups: [],
         ai_sdk_metadata: {
           parent_user_message_id: parentUserMessageId,
           model: modelOverride || localStorage.getItem("selected_llm_model") || "gemini-2.5-flash",
@@ -293,6 +302,20 @@ export function useChatStream({ threadId }: UseChatStreamOptions) {
                                 ...m,
                                 id: item.messageId || m.id,
                                 citations: cits,
+                              }
+                            : m
+                        )
+                      )
+                    } else if (item.type === "suggested_followups") {
+                      const suggestions = (item.suggestions as string[]) || []
+                      if (item.messageId) currentAssistantId = item.messageId
+                      setMessages((prev) =>
+                        prev.map((m) =>
+                          (m.id === assistantMessageId || m.id === currentAssistantId)
+                            ? {
+                                ...m,
+                                id: item.messageId || m.id,
+                                suggested_followups: suggestions,
                               }
                             : m
                         )
