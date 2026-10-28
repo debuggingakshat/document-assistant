@@ -18,6 +18,9 @@ export default defineConfig({
           if (id.includes("node_modules/lucide-react")) {
             return "icons"
           }
+          if (id.includes("node_modules/katex")) {
+            return "katex"
+          }
           if (
             id.includes("node_modules/react") ||
             id.includes("node_modules/react-dom") ||

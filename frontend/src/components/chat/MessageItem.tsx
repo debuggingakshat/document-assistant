@@ -1,4 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react"
+import katex from "katex"
 import {
   AlertTriangle,
   Check,
@@ -268,13 +269,67 @@ export const MessageItem = memo(function MessageItem({
     return map
   }, [message.citations, message.content])
 
-  // Render inline formatting (citations, bold, italics, code, superscripts)
+  // Helper to safely render KaTeX math expressions
+  function renderMath(math: string, displayMode: boolean): React.ReactNode {
+    try {
+      const cleanMath = math.trim()
+      const html = katex.renderToString(cleanMath, {
+        displayMode,
+        throwOnError: false,
+      })
+      return (
+        <span
+          className={cn(
+            displayMode
+              ? "my-2.5 block overflow-x-auto py-2 px-3 text-center rounded-xl bg-muted/30 border border-border/50 text-[14px]"
+              : "inline-block px-1 align-baseline text-[13.5px]"
+          )}
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
+      )
+    } catch {
+      return <code className="font-mono text-xs">{math}</code>
+    }
+  }
+
+  // Differentiates true mathematical equations (Altman Z, WACC, subscripts, Greek) from financial currency values ($45B, $201M)
+  function isLikelyMath(str: string): boolean {
+    const trimmed = str.trim()
+    // Explicit currency / percentage numbers e.g. "$201,183 million", "$45B", "50%" are NOT math
+    if (/^\d[\d,.]*(?:[kKmMbBtT]|(?:\s*(?:million|billion|trillion|percent|%)))?$/i.test(trimmed)) {
+      return false
+    }
+    // LaTeX backslash commands (e.g. \text, \le, \ge, \frac, \times, \alpha, \sum)
+    if (/\\[a-zA-Z]+/.test(trimmed)) return true
+    // Subscripts or superscripts (e.g. X_1, R^2, Z_3)
+    if (/[a-zA-Z]_[0-9a-zA-Z]/.test(trimmed) || /[a-zA-Z]\^[0-9a-zA-Z]/.test(trimmed)) return true
+    // Mathematical relationships between variables and operators (e.g. Z > 2.99, x = y + z)
+    if (/[a-zA-Z]\s*[=><+\-*/]\s*[0-9a-zA-Z]/.test(trimmed)) return true
+    // Standalone variables with subscripts (e.g. X_1, X_5)
+    if (/^[a-zA-Z]_[0-9a-zA-Z]+$/.test(trimmed)) return true
+    return false
+  }
+
+  // Render inline formatting (citations, bold, italics, code, math, superscripts)
   function renderInlineSpans(inlineText: string): React.ReactNode {
-    const inlineRegex = /(\[\^\d+\]|\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g
+    const inlineRegex = /(\[\^\d+\]|\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|\\\(.+?\\\)|\$[^$\n]+\$)/g
     const parts = inlineText.split(inlineRegex)
 
     return parts.map((part, i) => {
       if (!part) return null
+
+      // Inline LaTeX Math \( ... \)
+      if (part.startsWith("\\(") && part.endsWith("\\)") && part.length >= 4) {
+        return <span key={i}>{renderMath(part.slice(2, -2), false)}</span>
+      }
+
+      // Inline Math $ ... $
+      if (part.startsWith("$") && part.endsWith("$") && part.length >= 3) {
+        const inner = part.slice(1, -1)
+        if (isLikelyMath(inner)) {
+          return <span key={i}>{renderMath(inner, false)}</span>
+        }
+      }
 
       // Interactive Citation Chip [^n]
       const citMatch = part.match(/^\[\^(\d+)\]$/)
@@ -482,6 +537,31 @@ export const MessageItem = memo(function MessageItem({
         continue
       }
 
+      // Horizontal Rule / Divider (--- or ***)
+      if (/^(?:---+|\*\*\*+|___+)$/.test(trimmed)) {
+        flushList()
+        flushCallout()
+        elements.push(
+          <hr key={`hr-${lIdx}`} className="my-3 border-t border-border/60" />
+        )
+        continue
+      }
+
+      // Single-line Display Math: $$...$$ or \[...\]
+      if (/^(\$\$|\\\[).+(\$\$|\\\])\$?$/.test(trimmed)) {
+        flushList()
+        flushCallout()
+        const rawMath = trimmed
+          .replace(/^(\$\$|\\\[)\s*/, "")
+          .replace(/\s*(\${2,}|\\\])\$?$/, "")
+        elements.push(
+          <div key={`math-${lIdx}`} className="my-2.5 flex justify-center">
+            {renderMath(rawMath, true)}
+          </div>
+        )
+        continue
+      }
+
       // Blockquotes and Alerts (> [!WARNING] or > **Title**)
       if (trimmed.startsWith(">")) {
         flushList()
@@ -533,9 +613,9 @@ export const MessageItem = memo(function MessageItem({
         continue
       }
 
-      // List Item: - item or * item (not footnote)
-      if (/^[-*]\s+/.test(trimmed) && !trimmed.startsWith("*¹") && !trimmed.startsWith("*²")) {
-        listBuffer.push(trimmed.replace(/^[-*]\s+/, ""))
+      // List Item: - item, * item, • item, or numbered list
+      if (/^([•\-\*]|\d+\.)\s+/.test(trimmed) && !trimmed.startsWith("*¹") && !trimmed.startsWith("*²")) {
+        listBuffer.push(trimmed.replace(/^([•\-\*]|\d+\.)\s+/, ""))
         continue
       }
 
@@ -571,23 +651,27 @@ export const MessageItem = memo(function MessageItem({
     )
   }
 
-  // Format content with interactive GFM tables, HoverCards, and citation chips
+  // Format content with interactive GFM tables, math blocks, HoverCards, and citation chips
   function renderFormattedContent(text: string) {
     const hasGroundingWarning = text.includes("Grounding Verification Alert")
 
-    // Match Markdown Tables (header row + separator row + body rows)
-    const tableRegex = /((?:^|\n)\|[^\n]+\|\r?\n\|[\s:|-]+\|\r?\n(?:\|[^\n]+\|\r?\n?)+)/g
-    const blocks: Array<{ type: "text" | "table"; content: string }> = []
+    // Match Markdown Tables OR Multi-line Display Math ($$...$$ or \[...\])
+    const blockRegex = /((?:^|\n)\|[^\n]+\|\r?\n\|[\s:|-]+\|\r?\n(?:\|[^\n]+\|\r?\n?)+)|(\$\$[\s\S]+?\${2,}|\\\[[\s\S]+?\\\])/g
+    const blocks: Array<{ type: "text" | "table" | "math"; content: string }> = []
 
     let lastIndex = 0
     let match: RegExpExecArray | null
-    while ((match = tableRegex.exec(text)) !== null) {
+    while ((match = blockRegex.exec(text)) !== null) {
       const start = match.index
-      const end = tableRegex.lastIndex
+      const end = blockRegex.lastIndex
       if (start > lastIndex) {
         blocks.push({ type: "text", content: text.slice(lastIndex, start) })
       }
-      blocks.push({ type: "table", content: match[0].trim() })
+      if (match[1]) {
+        blocks.push({ type: "table", content: match[1].trim() })
+      } else if (match[2]) {
+        blocks.push({ type: "math", content: match[2].trim() })
+      }
       lastIndex = end
     }
     if (lastIndex < text.length) {
@@ -607,6 +691,16 @@ export const MessageItem = memo(function MessageItem({
                 renderInlineFormatted={renderInlineSpans}
                 tableIndex={tableCounter++}
               />
+            )
+          }
+          if (block.type === "math") {
+            const rawMath = block.content
+              .replace(/^(\$\$|\\\[)\s*/, "")
+              .replace(/\s*(\${2,}|\\\])\$?$/, "")
+            return (
+              <div key={idx} className="my-2.5 flex justify-center">
+                {renderMath(rawMath, true)}
+              </div>
             )
           }
           return renderTextBlock(block.content, idx)
