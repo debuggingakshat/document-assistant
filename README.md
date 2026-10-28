@@ -5,32 +5,16 @@
 > **Production Deployment ($0.00 / Month)**: [document-assistant-black.vercel.app](https://document-assistant-black.vercel.app)
 
 <p align="left">
-  <a href="https://document-assistant-black.vercel.app"><img src="https://img.shields.io/badge/Production-Live%20Cloud%20Demo-000000?style=flat-square&logo=vercel&logoColor=white" alt="Live Demo" /></a>
+  <a href="https://document-assistant-black.vercel.app"><img src="https://img.shields.io/badge/Production-Live%20Demo-000000?style=flat-square&logo=vercel&logoColor=white" alt="Live Demo" /></a>
   <a href="#automated-verification--benchmark-suite"><img src="https://img.shields.io/badge/Tests-71%2F71%20Passing-brightgreen?style=flat-square&logo=pytest&logoColor=white" alt="Automated Tests" /></a>
   <a href="#stage-4-4-gate-fail-closed-grounding-validator"><img src="https://img.shields.io/badge/Grounding-4--Gate%20Fail--Closed-success?style=flat-square&logo=shield&logoColor=white" alt="Grounding Safety" /></a>
-  <a href="#performance--quality-invariants"><img src="https://img.shields.io/badge/Retrieval-MRR%405%200.822-blue?style=flat-square" alt="Retrieval MRR" /></a>
   <a href="#license"><img src="https://img.shields.io/badge/License-MIT-yellow?style=flat-square" alt="License" /></a>
 </p>
 <p align="left">
   <a href="#core-system-architecture--innovations"><img src="https://img.shields.io/badge/Architecture-Modular%20RAG-orange?style=flat-square" alt="System Architecture" /></a>
-  <a href="#stage-3-pydanticai-reasoning-core--2d-waterfall-engine"><img src="https://img.shields.io/badge/Agent-PydanticAI%20v2.52-E37400?style=flat-square&logo=python&logoColor=white" alt="PydanticAI Agent" /></a>
-  <a href="#stage-1-concurrent-hybrid-retrieval"><img src="https://img.shields.io/badge/Retrieval-Dense%20%2B%20Sparse%20(RRF%20k%3D60)-1f6feb?style=flat-square" alt="Hybrid RRF Search" /></a>
-  <a href="#stage-1-concurrent-hybrid-retrieval"><img src="https://img.shields.io/badge/Vector%20Store-Supabase%20pgvector-3ECF8E?style=flat-square&logo=supabase&logoColor=white" alt="Supabase pgvector" /></a>
-  <a href="#4-step-2-backend-environment--database-setup"><img src="https://img.shields.io/badge/Backend-FastAPI%20(Python%203.13)-009688?style=flat-square&logo=fastapi&logoColor=white" alt="FastAPI Backend" /></a>
-</p>
-<p align="left">
-  <a href="#5-step-3-frontend-environment-setup"><img src="https://img.shields.io/badge/Frontend-React%2019%20%7C%20Tailwind%20v4-61DAFB?style=flat-square&logo=react&logoColor=black" alt="React 19 Frontend" /></a>
-  <a href="#5-step-3-frontend-environment-setup"><img src="https://img.shields.io/badge/Math%20%26%20Tables-KaTeX%20%7C%20GFM-cb3837?style=flat-square" alt="KaTeX & GFM Tables" /></a>
-  <a href="#corpus-verification--ingestion-2793-chunks-across-25-filings"><img src="https://img.shields.io/badge/SEC%2010--K-2%2C793%20Chunks%20(25%20Filings)-8A2BE2?style=flat-square" alt="SEC 10-K Corpus" /></a>
-  <a href="#production-deployment-topology-000--month"><img src="https://img.shields.io/badge/Cost-%240.00%20%2F%20Month-2ea44f?style=flat-square" alt="Cloud Cost" /></a>
-  <a href="#stage-3-pydanticai-reasoning-core--2d-waterfall-engine"><img src="https://img.shields.io/badge/Failover-2D%20Waterfall%20(2%2C160%2B%20RPD)-blueviolet?style=flat-square" alt="2D Waterfall Quota" /></a>
-</p>
-<p align="left">
-  <a href="#complete-from-scratch-redevelopment-guide"><img src="https://img.shields.io/badge/Setup-Local%20Runbook-58a6ff?style=flat-square&logo=git&logoColor=white" alt="Quickstart Runbook" /></a>
-  <a href="#2-empirical-grounding--retrieval-benchmark-100-pass-rate"><img src="https://img.shields.io/badge/Benchmark-15%20Audited%20Queries-ff69b4?style=flat-square" alt="Audit Benchmark" /></a>
-  <a href="#troubleshooting--engineering-invariants"><img src="https://img.shields.io/badge/Gotchas-Engineering%20Invariants-d29922?style=flat-square" alt="Engineering Invariants" /></a>
-  <a href="#master-architectural-documentation-map"><img src="https://img.shields.io/badge/Docs-Architecture%20Map-8957e5?style=flat-square" alt="Documentation Map" /></a>
-  <a href="specifics.md"><img src="https://img.shields.io/badge/Staff%20Blueprint-specifics.md%20(25%20Q%26As)-b62324?style=flat-square" alt="Master Interview Blueprint" /></a>
+  <a href="#stage-1-concurrent-hybrid-retrieval"><img src="https://img.shields.io/badge/Retrieval-Hybrid%20RRF%20(k=60)-blue?style=flat-square" alt="Hybrid RRF Search" /></a>
+  <a href="#complete-from-scratch-redevelopment-guide"><img src="https://img.shields.io/badge/Quickstart-Local%20Setup-58a6ff?style=flat-square&logo=git&logoColor=white" alt="Quickstart Runbook" /></a>
+  <a href="specifics.md"><img src="https://img.shields.io/badge/Master%20Blueprint-specifics.md%20(25%20Q%26As)-red?style=flat-square" alt="Master Interview Blueprint" /></a>
 </p>
 
 ---
