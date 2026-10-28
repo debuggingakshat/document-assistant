@@ -4,6 +4,35 @@
 > Audited 10-K Filings for **Apple (`AAPL`)**, **Amazon (`AMZN`)**, **Alphabet (`GOOGL`)**, **Microsoft (`MSFT`)**, and **NVIDIA (`NVDA`)** (FY2021 – FY2025).  
 > **Production Deployment ($0.00 / Month)**: [document-assistant-black.vercel.app](https://document-assistant-black.vercel.app)
 
+<p align="left">
+  <a href="https://document-assistant-black.vercel.app"><img src="https://img.shields.io/badge/Production-Live%20Cloud%20Demo-000000?style=flat-square&logo=vercel&logoColor=white" alt="Live Demo" /></a>
+  <a href="#automated-verification--benchmark-suite"><img src="https://img.shields.io/badge/Tests-71%2F71%20Passing-brightgreen?style=flat-square&logo=pytest&logoColor=white" alt="Automated Tests" /></a>
+  <a href="#stage-4-4-gate-fail-closed-grounding-validator"><img src="https://img.shields.io/badge/Grounding-4--Gate%20Fail--Closed-success?style=flat-square&logo=shield&logoColor=white" alt="Grounding Safety" /></a>
+  <a href="#performance--quality-invariants"><img src="https://img.shields.io/badge/Retrieval-MRR%405%200.822-blue?style=flat-square" alt="Retrieval MRR" /></a>
+  <a href="#license"><img src="https://img.shields.io/badge/License-MIT-yellow?style=flat-square" alt="License" /></a>
+</p>
+<p align="left">
+  <a href="#core-system-architecture--innovations"><img src="https://img.shields.io/badge/Architecture-Modular%20RAG-orange?style=flat-square" alt="System Architecture" /></a>
+  <a href="#stage-3-pydanticai-reasoning-core--2d-waterfall-engine"><img src="https://img.shields.io/badge/Agent-PydanticAI%20v2.52-E37400?style=flat-square&logo=python&logoColor=white" alt="PydanticAI Agent" /></a>
+  <a href="#stage-1-concurrent-hybrid-retrieval"><img src="https://img.shields.io/badge/Retrieval-Dense%20%2B%20Sparse%20(RRF%20k%3D60)-1f6feb?style=flat-square" alt="Hybrid RRF Search" /></a>
+  <a href="#stage-1-concurrent-hybrid-retrieval"><img src="https://img.shields.io/badge/Vector%20Store-Supabase%20pgvector-3ECF8E?style=flat-square&logo=supabase&logoColor=white" alt="Supabase pgvector" /></a>
+  <a href="#4-step-2-backend-environment--database-setup"><img src="https://img.shields.io/badge/Backend-FastAPI%20(Python%203.13)-009688?style=flat-square&logo=fastapi&logoColor=white" alt="FastAPI Backend" /></a>
+</p>
+<p align="left">
+  <a href="#5-step-3-frontend-environment-setup"><img src="https://img.shields.io/badge/Frontend-React%2019%20%7C%20Tailwind%20v4-61DAFB?style=flat-square&logo=react&logoColor=black" alt="React 19 Frontend" /></a>
+  <a href="#5-step-3-frontend-environment-setup"><img src="https://img.shields.io/badge/Math%20%26%20Tables-KaTeX%20%7C%20GFM-cb3837?style=flat-square" alt="KaTeX & GFM Tables" /></a>
+  <a href="#corpus-verification--ingestion-2793-chunks-across-25-filings"><img src="https://img.shields.io/badge/SEC%2010--K-2%2C793%20Chunks%20(25%20Filings)-8A2BE2?style=flat-square" alt="SEC 10-K Corpus" /></a>
+  <a href="#production-deployment-topology-000--month"><img src="https://img.shields.io/badge/Cost-%240.00%20%2F%20Month-2ea44f?style=flat-square" alt="Cloud Cost" /></a>
+  <a href="#stage-3-pydanticai-reasoning-core--2d-waterfall-engine"><img src="https://img.shields.io/badge/Failover-2D%20Waterfall%20(2%2C160%2B%20RPD)-blueviolet?style=flat-square" alt="2D Waterfall Quota" /></a>
+</p>
+<p align="left">
+  <a href="#complete-from-scratch-redevelopment-guide"><img src="https://img.shields.io/badge/Setup-Local%20Runbook-58a6ff?style=flat-square&logo=git&logoColor=white" alt="Quickstart Runbook" /></a>
+  <a href="#2-empirical-grounding--retrieval-benchmark-100-pass-rate"><img src="https://img.shields.io/badge/Benchmark-15%20Audited%20Queries-ff69b4?style=flat-square" alt="Audit Benchmark" /></a>
+  <a href="#troubleshooting--engineering-invariants"><img src="https://img.shields.io/badge/Gotchas-Engineering%20Invariants-d29922?style=flat-square" alt="Engineering Invariants" /></a>
+  <a href="#master-architectural-documentation-map"><img src="https://img.shields.io/badge/Docs-Architecture%20Map-8957e5?style=flat-square" alt="Documentation Map" /></a>
+  <a href="specifics.md"><img src="https://img.shields.io/badge/Staff%20Blueprint-specifics.md%20(25%20Q%26As)-b62324?style=flat-square" alt="Master Interview Blueprint" /></a>
+</p>
+
 ---
 
 ## Performance & Quality Invariants
@@ -13,10 +42,10 @@
 | **Grounding Pass Rate** | **100.0%** (11/11 Verified) | Zero ungrounded claims; 4-Gate Fail-Closed programmatic validation. |
 | **Retrieval Top-1 Precision** | **80.0%** (vs. Dense 66.7%) | Reciprocal Rank Fusion ($k=60$) + $\pm 1$ Neighbor Chunk Expansion. |
 | **Retrieval Top-5 Recall** | **86.7%** (MRR@5 = 0.822) | Concurrent FTS (`ts_rank_cd`) + Vector Cosine Similarity (`<=>`). |
-| **Daily Inference Quota** | **2,160+ Queries / Day** | 2D Waterfall Engine (2 Gemini API Keys $	imes$ 6 Cascaded Models at $0.00). |
+| **Daily Inference Quota** | **2,160+ Queries / Day** | 2D Waterfall Engine (2 Gemini API Keys $\times$ 6 Cascaded Models at $0.00). |
 | **Perceived New Thread Latency** | **0ms (Instantaneous)** | Enterprise Draft Architecture (lazy thread creation on initial prompt). |
 | **Corpus Scale** | **2,793 Chunks (25 Filings)** | 8.58 MB pgvector RAM footprint; normalized GitHub-Flavored Markdown tables. |
-| **Automated Test Coverage** | **65 / 65 Passing** | Complete test suite across API, auth, chat, grounding, retrieval, and ingest. |
+| **Automated Test Coverage** | **71 / 71 Passing** | Complete test suite across API, auth, chat, grounding, retrieval, follow-ups, and ingest. |
 
 ---
 
@@ -205,13 +234,13 @@ Open your browser to `http://localhost:5173`:
 
 Document Assistant features a fully automated verification pipeline to mathematically guarantee zero regressions and verify 100% grounded accuracy:
 
-### 1. Complete Pytest Suite (65/65 Passing)
-Executes all unit, integration, grounding, and retrieval tests:
+### 1. Complete Pytest Suite (71/71 Passing)
+Executes all unit, integration, grounding, follow-ups, and retrieval tests:
 ```bash
 cd backend
 .venv/bin/pytest tests -v
 ```
-*Expected Output: `65 passed in ~10s`.*
+*Expected Output: `71 passed in ~8s`.*
 
 ### 2. Empirical Grounding & Retrieval Benchmark (100% Pass Rate)
 Runs the empirical benchmark across live database queries and 4-gate verification:
@@ -238,10 +267,13 @@ Validates TypeScript type safety and minified production asset bundling:
 cd frontend
 npm run build
 ```
-*Expected Output: `built in ~450ms` with zero errors.*
+*Expected Output: `built in ~300ms` with zero errors.*
 
 ---
 
+<a id="stage-1-concurrent-hybrid-retrieval"></a>
+<a id="stage-3-pydanticai-reasoning-core--2d-waterfall-engine"></a>
+<a id="stage-4-4-gate-fail-closed-grounding-validator"></a>
 ## Core System Architecture & Innovations
 
 ```
@@ -373,3 +405,10 @@ document-assistant/
     ├── todos.md                        # Implementation Roadmap Checklist
     └── guides/                         # Setup Guides (Supabase, Backend, Frontend)
 ```
+
+---
+
+<a id="license"></a>
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
