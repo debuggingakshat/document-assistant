@@ -42,16 +42,17 @@ export function PipelineStatusIndicator({
     (typeof window !== "undefined"
       ? localStorage.getItem("selected_llm_model")
       : null) ||
-    "gemini-2.5-flash"
+    "gemini-3.5-flash-lite"
 
   const activeModelLabel = useMemo(() => {
     if (activeModelRaw === "gemini-3-flash" || activeModelRaw === "gemini-3-flash-preview") return "Gemini 3 Flash"
+    if (activeModelRaw === "gemini-3.5-flash-lite") return "Gemini 3.5 Flash Lite"
+    if (activeModelRaw === "gemini-flash-lite-latest") return "Gemini Flash Lite"
     if (activeModelRaw === "gemini-2.5-flash") return "Gemini 2.5 Flash"
     if (activeModelRaw === "gemini-2.0-flash" || activeModelRaw === "gemini-3.8-flash") return "Gemini 2.0 Flash"
-    if (activeModelRaw === "gemini-2.0-flash-lite" || activeModelRaw === "gemini-flash-lite-latest") return "Gemini 2.0 Flash Lite"
+    if (activeModelRaw === "gemini-2.0-flash-lite") return "Gemini 2.0 Flash Lite"
     if (activeModelRaw === "gemini-3.1-flash-lite" || activeModelRaw === "gemini-3.1-flash-lite-preview") return "Gemini 3.1 Flash Lite"
-    if (activeModelRaw === "gemini-3.5-flash-lite") return "Gemini 3.5 Flash Lite"
-    return "Gemini 2.5 Flash"
+    return "Gemini 3.5 Flash Lite"
   }, [activeModelRaw])
 
   const stages = useMemo(

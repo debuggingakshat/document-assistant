@@ -525,8 +525,11 @@ async def orchestrate_turn(
 
     # 5. Persist assistant message with model & parent linkage
     followup_suggestions = getattr(grounded_answer, "suggested_followups", []) or []
+    req_model_name = model_name or "gemini-3-flash-preview"
     asst_metadata: dict[str, Any] = {
         "model": actual_model_used,
+        "requested_model": req_model_name,
+        "was_switched": bool(actual_model_used != req_model_name),
         "suggested_followups": followup_suggestions,
     }
     if parent_user_message_id:
@@ -921,19 +924,26 @@ async def stream_orchestrated_turn(
         yield format_ai_sdk_finish_part()
         return
 
-    # If auto-failover switched models, immediately inform the progress stepper
-    if isinstance(actual_model_used, str) and actual_model_used != target_primary_name:
+    # If auto-failover or endpoint aliasing switched models, inform the progress stepper
+    was_switched = bool(actual_model_used != active_llm_name)
+    if was_switched:
         failover_label = MODEL_DISPLAY_NAMES.get(actual_model_used, actual_model_used)
-        primary_label = MODEL_DISPLAY_NAMES.get(target_primary_name, target_primary_name)
+        requested_label = MODEL_DISPLAY_NAMES.get(active_llm_name, active_llm_name)
+        if actual_model_used != target_primary_name:
+            reason = f"{requested_label} capacity reached across API keys. Seamlessly switched to {failover_label}..."
+        else:
+            reason = f"{requested_label} endpoint routed to high-capacity {failover_label}..."
+
         yield format_ai_sdk_status_part(
             stage="reasoning",
-            title=f"Auto-Routed: {primary_label} → {failover_label}",
-            message=f"{primary_label} capacity reached across API keys. Seamlessly switched to {failover_label}...",
+            title=f"Auto-Routed: {requested_label} → {failover_label}",
+            message=reason,
             technical_details={
                 "orchestrator": "PydanticAI Multi-Key Waterfall",
-                "requested_model": primary_label,
+                "requested_model": requested_label,
                 "active_model": failover_label,
                 "status": "auto_failover_success",
+                "llm": actual_model_used,
             },
         )
 
@@ -969,8 +979,11 @@ async def stream_orchestrated_turn(
 
     # 5. Persist assistant message with model & parent linkage
     followup_suggestions = getattr(grounded_answer, "suggested_followups", []) or []
+    req_model_name = model_name or "gemini-3-flash-preview"
     asst_metadata: dict[str, Any] = {
         "model": actual_model_used,
+        "requested_model": req_model_name,
+        "was_switched": bool(actual_model_used != req_model_name),
         "suggested_followups": followup_suggestions,
     }
     if parent_user_message_id:
@@ -1038,6 +1051,18 @@ async def stream_orchestrated_turn(
                 "protocol": "Vercel AI SDK SSE Data Stream",
             },
         )
+    # 6.5 Yield model_resolved event so client message header instantly synchronizes
+    model_resolved_payload = {
+        "type": "model_resolved",
+        "messageId": str(asst_msg_id),
+        "actualModel": actual_model_used,
+        "actualModelLabel": MODEL_DISPLAY_NAMES.get(actual_model_used, actual_model_used),
+        "requestedModel": active_llm_name,
+        "requestedModelLabel": MODEL_DISPLAY_NAMES.get(active_llm_name, active_llm_name),
+        "wasSwitched": was_switched,
+    }
+    yield f"2:[{json.dumps(model_resolved_payload)}]\n"
+
     # 7. Stream text response tokens with accelerated fluid sweep (sub-second delivery)
     words = final_answer_text.split(" ")
     for i, word in enumerate(words):

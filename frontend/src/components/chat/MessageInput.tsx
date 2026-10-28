@@ -11,34 +11,34 @@ import { cn } from "@/lib/utils"
 
 export const FREE_GEMINI_MODELS = [
   {
+    id: "gemini-3.5-flash-lite",
+    name: "Gemini 3.5 Flash Lite",
+    tag: "1,500 RPD Workhorse",
+    desc: "High-capacity tier: 1,500 daily requests per key & sub-second latency",
+  },
+  {
     id: "gemini-3-flash-preview",
     name: "Gemini 3 Flash",
     tag: "Flagship",
     desc: "Frontier reasoning & advanced synthetic disclosures",
   },
   {
-    id: "gemini-2.5-flash",
-    name: "Gemini 2.5 Flash",
-    tag: "Balanced",
-    desc: "Optimal speed & high quality financial reasoning",
+    id: "gemini-flash-lite-latest",
+    name: "Gemini Flash Lite",
+    tag: "Lowest Latency",
+    desc: "Lightweight quick answers & sub-second latency",
   },
   {
     id: "gemini-2.0-flash",
     name: "Gemini 2.0 Flash",
     tag: "Ultra Fast",
-    desc: "High-speed standard response generation",
+    desc: "High-speed response generation (auto-routed to high-quota tier)",
   },
   {
-    id: "gemini-2.0-flash-lite",
-    name: "Gemini 2.0 Flash Lite",
-    tag: "Lowest Latency",
-    desc: "Lightweight quick answers & sub-second latency",
-  },
-  {
-    id: "gemini-3.1-flash-lite-preview",
-    name: "Gemini 3.1 Flash Lite",
-    tag: "500 RPD Quota",
-    desc: "High-capacity tier: 500 daily requests per key",
+    id: "gemini-2.5-flash",
+    name: "Gemini 2.5 Flash",
+    tag: "Balanced",
+    desc: "Optimal speed & financial reasoning",
   },
 ] as const
 
@@ -56,7 +56,7 @@ export function MessageInput({ onSend, disabled }: MessageInputProps) {
         return saved
       }
     }
-    return "gemini-2.5-flash"
+    return "gemini-3.5-flash-lite"
   })
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)

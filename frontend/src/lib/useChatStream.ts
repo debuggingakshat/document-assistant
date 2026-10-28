@@ -306,6 +306,24 @@ export function useChatStream({ threadId }: UseChatStreamOptions) {
                             : m
                         )
                       )
+                    } else if (item.type === "model_resolved") {
+                      if (item.messageId) currentAssistantId = item.messageId
+                      setMessages((prev) =>
+                        prev.map((m) =>
+                          (m.id === assistantMessageId || m.id === currentAssistantId)
+                            ? {
+                                ...m,
+                                id: item.messageId || m.id,
+                                ai_sdk_metadata: {
+                                  ...m.ai_sdk_metadata,
+                                  model: item.actualModel,
+                                  requested_model: item.requestedModel,
+                                  was_switched: item.wasSwitched,
+                                },
+                              }
+                            : m
+                        )
+                      )
                     } else if (item.type === "suggested_followups") {
                       const suggestions = (item.suggestions as string[]) || []
                       if (item.messageId) currentAssistantId = item.messageId

@@ -2460,3 +2460,40 @@ To deliver a smooth `1%, 2%, 3%, 4%... 100%` progress experience without floodin
 3. **Rollup Vendor Chunk Splitting**:
    - To prevent KaTeX fonts and engine logic from swelling the primary application entrypoint, [`vite.config.ts`](frontend/vite.config.ts) extracts KaTeX into a standalone vendor chunk (`katex-*.js`, 259 kB / 77 kB gzip).
    - The primary application bundle remains compact at 476 kB (129 kB gzip), achieving 0ms UI blocking and a 296ms total production build."
+---
+
+#### Question 26: Why did Active Telemetry display 'Gemini 3.5 Flash Lite' when 'Gemini 2.0 Flash' was selected in the UI dropdown while the message header displayed 'Gemini 2.0 Flash', and how do real-time SSE `model_resolved` events, upstream endpoint migrations, and visual failover badges eliminate telemetry divergence?
+
+##### Institutional Engineering Answer:
+"In production AI platforms running multi-model waterfalls and cascading quota management, state divergence between client UI controls, real-time streaming telemetry, and final message badges is a classic distributed systems challenge:
+
+1. **Diagnosis of the Dual Telemetry Disconnect**:
+   - **Backend Static Aliasing vs. Dynamic Waterfall**:
+     Under upstream provider changes, legacy model IDs (such as `models/gemini-2.0-flash` and `models/gemini-2.5-flash`) were deprecated by Google AI Studio with HTTP 404 (`'This model is no longer available'`). To protect users from runtime crashes, [`model.py`](backend/app/assistant/model.py) introduced `MODEL_ALIASES` mapping legacy flash aliases to high-quota endpoints (`gemini-3.5-flash-lite`, 1,500 RPD).
+     Because this mapping was applied statically on request arrival, [`orchestrator.py`](backend/app/chat/orchestrator.py) immediately dispatched Active Telemetry status events reporting `llm: gemini-3.5-flash-lite`, even though the user had selected `Gemini 2.0 Flash`.
+   - **The Frontend Optimistic State Gap**:
+     In [`useChatStream.ts`](frontend/src/lib/useChatStream.ts), assistant messages were optimistically instantiated with `ai_sdk_metadata.model = localStorage.getItem("selected_llm_model")`. While the backend persisted `actual_model_used` into Supabase PostgreSQL, the SSE data stream only dispatched text tokens (`0:`), citations, and thread titles.
+     Because no event updated `ai_sdk_metadata.model` in live React state, [`MessageItem.tsx`](frontend/src/components/chat/MessageItem.tsx) rendered the top badge using the optimistic model (`Gemini 2.0 Flash`), creating a confusing contradiction with the Active Telemetry card (`Gemini 3.5 Flash Lite`).
+
+2. **The 3-Tier Distributed Synchronization Solution**:
+   - **Real-Time `model_resolved` SSE Event**:
+     In [`orchestrator.py`](backend/app/chat/orchestrator.py), immediately after model execution completes and the assistant record is saved, a typed data frame is yielded:
+     ```python
+     yield f"2:[{json.dumps({
+         'type': 'model_resolved',
+         'messageId': str(asst_msg_id),
+         'actualModel': actual_model_used,
+         'actualModelLabel': MODEL_DISPLAY_NAMES.get(actual_model_used, actual_model_used),
+         'requestedModel': active_llm_name,
+         'requestedModelLabel': MODEL_DISPLAY_NAMES.get(active_llm_name, active_llm_name),
+         'wasSwitched': was_switched,
+     })}]\n"
+     ```
+   - **Reactive Client State Mutation**:
+     [`useChatStream.ts`](frontend/src/lib/useChatStream.ts) listens for `model_resolved` and immediately mutates `message.ai_sdk_metadata` with the verified model and switch status. Both the streaming session and subsequent message versions reflect the exact model instance in sub-millisecond real time.
+   - **Tactile Visual Failover Badge**:
+     In [`MessageItem.tsx`](frontend/src/components/chat/MessageItem.tsx), when `was_switched` is `true`, the model badge transitions to an amber warning tone with an explicit `(Auto-Routed)` pill and tooltip (e.g. *'Auto-routed to Gemini 3.5 Flash Lite (Requested: Gemini 2.0 Flash)'*).
+     Concurrently, the Active Telemetry stepper displays:
+     *`Auto-Routed: Gemini 2.0 Flash → Gemini 3.5 Flash Lite (endpoint routed to high-capacity tier)`*.
+   - **Model Selector Modernization**:
+     In [`MessageInput.tsx`](frontend/src/components/chat/MessageInput.tsx), the active live endpoints (`Gemini 3.5 Flash Lite (1,500 RPD Workhorse)`, `Gemini 3 Flash (Flagship)`, `Gemini Flash Lite (Lowest Latency)`) are surfaced explicitly as first-class options with transparent latency and quota tags, eliminating unexpected routing from the outset."

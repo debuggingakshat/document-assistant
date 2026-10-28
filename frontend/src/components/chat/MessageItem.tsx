@@ -63,12 +63,26 @@ export const MessageItem = memo(function MessageItem({
   const modelBadge = useMemo(() => {
     const raw = message.ai_sdk_metadata?.model
     if (raw === "gemini-3-flash" || raw === "gemini-3-flash-preview") return "Gemini 3 Flash"
+    if (raw === "gemini-3.5-flash-lite") return "Gemini 3.5 Flash Lite"
+    if (raw === "gemini-flash-lite-latest") return "Gemini Flash Lite"
     if (raw === "gemini-2.5-flash") return "Gemini 2.5 Flash"
     if (raw === "gemini-2.0-flash" || raw === "gemini-3.8-flash") return "Gemini 2.0 Flash"
-    if (raw === "gemini-2.0-flash-lite" || raw === "gemini-flash-lite-latest") return "Gemini 2.0 Flash Lite"
+    if (raw === "gemini-2.0-flash-lite") return "Gemini 2.0 Flash Lite"
     if (raw === "gemini-3.1-flash-lite" || raw === "gemini-3.1-flash-lite-preview") return "Gemini 3.1 Flash Lite"
+    return raw || "Gemini 3.5 Flash Lite"
+  }, [message.ai_sdk_metadata])
+
+  const requestedModelBadge = useMemo(() => {
+    const raw = message.ai_sdk_metadata?.requested_model
+    if (!raw) return null
+    if (raw === "gemini-3-flash" || raw === "gemini-3-flash-preview") return "Gemini 3 Flash"
     if (raw === "gemini-3.5-flash-lite") return "Gemini 3.5 Flash Lite"
-    return raw || "Gemini 2.5 Flash"
+    if (raw === "gemini-flash-lite-latest") return "Gemini Flash Lite"
+    if (raw === "gemini-2.5-flash") return "Gemini 2.5 Flash"
+    if (raw === "gemini-2.0-flash" || raw === "gemini-3.8-flash") return "Gemini 2.0 Flash"
+    if (raw === "gemini-2.0-flash-lite") return "Gemini 2.0 Flash Lite"
+    if (raw === "gemini-3.1-flash-lite" || raw === "gemini-3.1-flash-lite-preview") return "Gemini 3.1 Flash Lite"
+    return raw
   }, [message.ai_sdk_metadata])
 
   const timeDisplay = formatMessageTime(message.created_at)
@@ -780,13 +794,30 @@ export const MessageItem = memo(function MessageItem({
           )}
 
           {!isUser && (
-            <span className="inline-flex items-center gap-1.5 rounded-md border border-border/60 bg-muted/70 px-1.5 py-0.5 font-mono text-[9.5px] text-muted-foreground shadow-2xs">
+            <span
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-md border px-1.5 py-0.5 font-mono text-[9.5px] shadow-2xs transition-colors",
+                message.ai_sdk_metadata?.was_switched
+                  ? "border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                  : "border-border/60 bg-muted/70 text-muted-foreground"
+              )}
+              title={
+                message.ai_sdk_metadata?.was_switched
+                  ? `Auto-routed to ${modelBadge} (Requested: ${requestedModelBadge || "primary"})`
+                  : undefined
+              }
+            >
               <img
                 src="/gemini-logo.png"
                 alt="Gemini"
                 className="size-3 object-contain shrink-0"
               />
               <span>{modelBadge}</span>
+              {message.ai_sdk_metadata?.was_switched && (
+                <span className="text-[8.5px] font-semibold text-amber-600/90 dark:text-amber-400/90">
+                  (Auto-Routed)
+                </span>
+              )}
             </span>
           )}
 

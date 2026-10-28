@@ -14,7 +14,7 @@
   <a href="#core-system-architecture--innovations"><img src="https://img.shields.io/badge/Architecture-Modular%20RAG-orange?style=flat-square" alt="System Architecture" /></a>
   <a href="#stage-1-concurrent-hybrid-retrieval"><img src="https://img.shields.io/badge/Retrieval-Hybrid%20RRF%20(k=60)-blue?style=flat-square" alt="Hybrid RRF Search" /></a>
   <a href="#complete-from-scratch-redevelopment-guide"><img src="https://img.shields.io/badge/Quickstart-Local%20Setup-58a6ff?style=flat-square&logo=git&logoColor=white" alt="Quickstart Runbook" /></a>
-  <a href="specifics.md"><img src="https://img.shields.io/badge/Master%20Blueprint-specifics.md%20(25%20Q%26As)-red?style=flat-square" alt="Master Interview Blueprint" /></a>
+  <a href="specifics.md"><img src="https://img.shields.io/badge/Master%20Blueprint-specifics.md%20(26%20Q%26As)-red?style=flat-square" alt="Master Interview Blueprint" /></a>
 </p>
 
 ---
