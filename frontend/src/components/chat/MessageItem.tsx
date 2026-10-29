@@ -325,7 +325,7 @@ export const MessageItem = memo(function MessageItem({
 
   // Render inline formatting (citations, bold, italics, code, math, superscripts)
   function renderInlineSpans(inlineText: string): React.ReactNode {
-    const inlineRegex = /(\[\^\d+\]|\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|\\\(.+?\\\)|\$[^$\n]+\$)/g
+    const inlineRegex = /(\[\^\d+\]|\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|\\\(.+?\\\)|\$(?!\d|\s)[^$\n]*?(?<!\s)\$)/g
     const parts = inlineText.split(inlineRegex)
 
     return parts.map((part, i) => {
@@ -342,6 +342,11 @@ export const MessageItem = memo(function MessageItem({
         if (isLikelyMath(inner)) {
           return <span key={i}>{renderMath(inner, false)}</span>
         }
+        return (
+          <span key={i}>
+            ${renderInlineSpans(inner)}$
+          </span>
+        )
       }
 
       // Interactive Citation Chip [^n]
