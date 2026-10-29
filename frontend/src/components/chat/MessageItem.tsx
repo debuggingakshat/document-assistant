@@ -51,7 +51,7 @@ export const MessageItem = memo(function MessageItem({
   onSelectVersion,
   onRegenerate,
   onRetryPrompt,
-  hasResponse = true,
+  hasResponse: _hasResponse = true,
   pipelineStatus,
   onSelectCitation,
 }: MessageItemProps) {
@@ -782,10 +782,7 @@ export const MessageItem = memo(function MessageItem({
               type="button"
               onClick={onRetryPrompt}
               disabled={isStreaming}
-              className={cn(
-                "flex size-5 items-center justify-center rounded text-muted-foreground transition-all hover:bg-muted hover:text-foreground cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed",
-                hasResponse ? "opacity-0 group-hover:opacity-100" : "opacity-100 text-foreground"
-              )}
+              className="flex size-5 items-center justify-center rounded text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted hover:text-foreground cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               title="Resend prompt & generate response"
             >
               <RotateCw className={cn("size-3", isStreaming && "animate-spin")} />
@@ -798,12 +795,10 @@ export const MessageItem = memo(function MessageItem({
               type="button"
               onClick={() => void handleCopy()}
               className={cn(
-                "flex size-5 items-center justify-center rounded text-muted-foreground transition-all hover:bg-muted hover:text-foreground cursor-pointer",
+                "flex size-5 items-center justify-center rounded text-muted-foreground transition-opacity hover:bg-muted hover:text-foreground cursor-pointer",
                 copied
                   ? "opacity-100 text-emerald-500"
-                  : hasResponse
-                  ? "opacity-0 group-hover:opacity-100"
-                  : "opacity-100"
+                  : "opacity-0 group-hover:opacity-100"
               )}
               title={copied ? "Copied!" : "Copy prompt"}
             >
@@ -845,7 +840,10 @@ export const MessageItem = memo(function MessageItem({
 
           {timeDisplay && (
             <span
-              className="flex items-center gap-1 font-mono text-[10px] text-muted-foreground/75 cursor-default"
+              className={cn(
+                "flex items-center gap-1 font-mono text-[10px] text-muted-foreground/75 cursor-default transition-opacity",
+                isUser ? "opacity-0 group-hover:opacity-100" : "opacity-100"
+              )}
               title={fullDateTimeDisplay}
             >
               <Clock className="size-2.5 opacity-60" />
