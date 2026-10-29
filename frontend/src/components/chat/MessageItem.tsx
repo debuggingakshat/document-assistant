@@ -792,6 +792,29 @@ export const MessageItem = memo(function MessageItem({
             </button>
           )}
 
+          {/* Copy button for user prompt */}
+          {isUser && message.content && (
+            <button
+              type="button"
+              onClick={() => void handleCopy()}
+              className={cn(
+                "flex size-5 items-center justify-center rounded text-muted-foreground transition-all hover:bg-muted hover:text-foreground cursor-pointer",
+                copied
+                  ? "opacity-100 text-emerald-500"
+                  : hasResponse
+                  ? "opacity-0 group-hover:opacity-100"
+                  : "opacity-100"
+              )}
+              title={copied ? "Copied!" : "Copy prompt"}
+            >
+              {copied ? (
+                <Check className="size-3 text-emerald-500" />
+              ) : (
+                <Copy className="size-3" />
+              )}
+            </button>
+          )}
+
           {!isUser && (
             <span
               className={cn(
