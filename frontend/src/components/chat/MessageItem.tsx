@@ -12,7 +12,6 @@ import {
   FileSpreadsheet,
   RotateCw,
   ShieldCheck,
-  Sparkles,
   User,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -968,13 +967,9 @@ export const MessageItem = memo(function MessageItem({
             message.suggested_followups &&
             message.suggested_followups.length > 0 && (
               <div className="mt-3.5 pt-3 border-t border-border/50">
-                <div className="flex items-center justify-between mb-2 select-none">
-                  <div className="flex items-center gap-1.5 text-[10.5px] font-semibold text-muted-foreground uppercase tracking-wider font-mono">
-                    <Sparkles className="size-3 text-primary animate-pulse" />
-                    <span>Suggested Follow-Ups</span>
-                  </div>
-                  <span className="text-[10px] text-muted-foreground/60 font-sans">
-                    Click to load in editor
+                <div className="mb-2 select-none">
+                  <span className="text-[10.5px] font-semibold text-muted-foreground uppercase tracking-wider font-mono">
+                    Suggested Follow-Ups
                   </span>
                 </div>
 
@@ -1004,17 +999,9 @@ export const MessageItem = memo(function MessageItem({
                         )}
                         title="Click to populate query in editor"
                       >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <Sparkles
-                            className={cn(
-                              "size-3 shrink-0 transition-transform group-hover:scale-110",
-                              isLoaded ? "text-primary" : "text-muted-foreground/70"
-                            )}
-                          />
-                          <span className="line-clamp-2 leading-snug">
-                            {promptText}
-                          </span>
-                        </div>
+                        <span className="line-clamp-2 leading-snug min-w-0">
+                          {promptText}
+                        </span>
 
                         <div className="shrink-0 flex items-center ml-1">
                           {isLoaded ? (
