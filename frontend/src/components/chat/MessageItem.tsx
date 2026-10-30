@@ -5,7 +5,6 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
-  Clock,
   Copy,
   CornerDownLeft,
   ExternalLink,
@@ -750,7 +749,7 @@ export const MessageItem = memo(function MessageItem({
     >
       {/* Assistant Avatar: Meridian Emblem */}
       {!isUser && (
-        <div className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-border/80 bg-card p-1 shadow-2xs mt-0.5">
+        <div className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-border/80 bg-card p-1 shadow-2xs">
           <img
             src="/meridian-emblem-light.png"
             alt="Meridian Research"
@@ -770,50 +769,16 @@ export const MessageItem = memo(function MessageItem({
           isUser ? "items-end" : "items-start"
         )}
       >
-        {/* Header bar with Sender & Timestamp */}
+        {/* Header bar with Sender */}
         <div
           className={cn(
-            "mb-1 flex items-center gap-1.5 text-[11px] text-muted-foreground px-1",
+            "mb-1 flex h-7 items-center gap-1.5 text-[11px] text-muted-foreground px-0.5",
             isUser ? "flex-row-reverse" : "flex-row"
           )}
         >
           <span className="font-medium text-foreground">
             {isUser ? "You" : "Document Assistant"}
           </span>
-
-          {/* Quick retry button for user prompts */}
-          {isUser && onRetryPrompt && (
-            <button
-              type="button"
-              onClick={onRetryPrompt}
-              disabled={isStreaming}
-              className="flex size-5 items-center justify-center rounded text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted hover:text-foreground cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-              title="Resend prompt & generate response"
-            >
-              <RotateCw className={cn("size-3", isStreaming && "animate-spin")} />
-            </button>
-          )}
-
-          {/* Copy button for user prompt */}
-          {isUser && message.content && (
-            <button
-              type="button"
-              onClick={() => void handleCopy()}
-              className={cn(
-                "flex size-5 items-center justify-center rounded text-muted-foreground transition-opacity hover:bg-muted hover:text-foreground cursor-pointer",
-                copied
-                  ? "opacity-100 text-emerald-500"
-                  : "opacity-0 group-hover:opacity-100"
-              )}
-              title={copied ? "Copied!" : "Copy prompt"}
-            >
-              {copied ? (
-                <Check className="size-3 text-emerald-500" />
-              ) : (
-                <Copy className="size-3" />
-              )}
-            </button>
-          )}
 
           {!isUser && (
             <span
@@ -840,19 +805,6 @@ export const MessageItem = memo(function MessageItem({
                   (Auto-Routed)
                 </span>
               )}
-            </span>
-          )}
-
-          {timeDisplay && (
-            <span
-              className={cn(
-                "flex items-center gap-1 font-mono text-[10px] text-muted-foreground/75 cursor-default transition-opacity",
-                isUser ? "opacity-0 group-hover:opacity-100" : "opacity-100"
-              )}
-              title={fullDateTimeDisplay}
-            >
-              <Clock className="size-2.5 opacity-60" />
-              {timeDisplay}
             </span>
           )}
         </div>
@@ -1117,11 +1069,60 @@ export const MessageItem = memo(function MessageItem({
             )}
           </div>
         )}
+
+        {/* User Message Actions & Footer Timestamp (Below the user prompt bubble) */}
+        {isUser && message.content && (
+          <div
+            className={cn(
+              "mt-1.5 flex items-center gap-1 text-[11px] text-muted-foreground select-none px-1 transition-opacity",
+              copied ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+            )}
+          >
+            {/* Copy Button (Icon only) */}
+            <button
+              type="button"
+              onClick={() => void handleCopy()}
+              className="flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-muted/70 hover:text-foreground cursor-pointer transition-colors"
+              title={copied ? "Copied!" : "Copy prompt"}
+            >
+              {copied ? (
+                <Check className="size-3.5 text-emerald-500" />
+              ) : (
+                <Copy className="size-3.5" />
+              )}
+            </button>
+
+            {/* Regenerate / Resend Button (Icon only) */}
+            {onRetryPrompt && (
+              <button
+                type="button"
+                onClick={onRetryPrompt}
+                disabled={isStreaming}
+                className="flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-muted/70 hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                title="Resend prompt & generate response"
+              >
+                <RotateCw
+                  className={cn("size-3.5", isStreaming && "animate-spin")}
+                />
+              </button>
+            )}
+
+            {/* Timestamp */}
+            {timeDisplay && (
+              <span
+                className="ml-1 font-mono text-[9.5px] text-muted-foreground/60 cursor-default"
+                title={fullDateTimeDisplay}
+              >
+                · {timeDisplay}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* User Avatar */}
       {isUser && (
-        <div className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-border/80 bg-muted text-muted-foreground shadow-xs mt-0.5">
+        <div className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-border/80 bg-muted text-muted-foreground shadow-xs">
           <User className="size-3.5" />
         </div>
       )}
