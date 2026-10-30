@@ -769,18 +769,13 @@ export const MessageItem = memo(function MessageItem({
           isUser ? "items-end" : "items-start"
         )}
       >
-        {/* Header bar with Sender */}
-        <div
-          className={cn(
-            "mb-1 flex h-7 items-center gap-1.5 text-[11px] text-muted-foreground px-0.5",
-            isUser ? "flex-row-reverse" : "flex-row"
-          )}
-        >
-          <span className="font-medium text-foreground">
-            {isUser ? "You" : "Document Assistant"}
-          </span>
+        {/* Header bar with Sender (Assistant only) */}
+        {!isUser && (
+          <div className="mb-1 flex h-7 items-center gap-1.5 text-[11px] text-muted-foreground px-0.5 flex-row">
+            <span className="font-medium text-foreground">
+              Document Assistant
+            </span>
 
-          {!isUser && (
             <span
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-md border px-1.5 py-0.5 font-mono text-[9.5px] shadow-2xs transition-colors",
@@ -806,8 +801,8 @@ export const MessageItem = memo(function MessageItem({
                 </span>
               )}
             </span>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Message Box (Subtle card for assistant, refined soft neutral bubble for user) */}
         <div
@@ -1122,7 +1117,7 @@ export const MessageItem = memo(function MessageItem({
 
       {/* User Avatar */}
       {isUser && (
-        <div className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-border/80 bg-muted text-muted-foreground shadow-xs">
+        <div className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-border/80 bg-muted text-muted-foreground shadow-xs mt-1">
           <User className="size-3.5" />
         </div>
       )}
