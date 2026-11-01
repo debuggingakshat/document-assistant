@@ -341,6 +341,17 @@ async def test_maybe_generate_thread_title_deferred_for_greetings() -> None:
     )
     assert title_res_locked is None
 
+    # 4. When thread has a legacy truncated title ending in "..." -> it is eligible for upgrade
+    mock_client.table().select().eq().execute.return_value = MagicMock(
+        data=[{"id": str(thread_id), "title": "What were AWS net sales and operating income in 2023 an..."}]
+    )
+    title_res_ellipsis_greeting = await maybe_generate_thread_title(
+        client=mock_client,
+        thread_id=thread_id,
+        user_content="hi bud",
+    )
+    assert title_res_ellipsis_greeting is None
+
 
 # ===========================================================================
 # ROUTING, BROADENED FINANCE COVERAGE, & TICKER INHERITANCE TRANSITION TESTS

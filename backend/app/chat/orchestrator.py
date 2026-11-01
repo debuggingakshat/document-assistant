@@ -629,6 +629,7 @@ async def maybe_generate_thread_title(
         is_placeholder_or_greeting = (
             not current_title
             or current_title in ("", "Untitled Analysis", "Untitled Thread", "New Thread")
+            or current_title.endswith("...")
             or _is_low_information_greeting(current_title)
             or any(
                 current_title.lower().startswith(p)
@@ -671,7 +672,7 @@ async def maybe_generate_thread_title(
                 )
                 res = await asyncio.wait_for(title_agent.run(user_content), timeout=5.0)
                 raw = res.output.strip().strip('"').strip("'").strip()
-                extracted = (raw.splitlines()[0] if raw.splitlines() else raw).strip(".").strip()[:50]
+                extracted = (raw.splitlines()[0] if raw.splitlines() else raw).strip(".").strip()[:80]
 
                 # LLM Semantic Gate: If the LLM deemed it conversational banter, defer titling
                 if not extracted or extracted.upper() == "UNTITLED" or extracted.upper().startswith("UNTITLED"):

@@ -1353,7 +1353,10 @@ export function Sidebar({
               isActive ? "text-primary" : "opacity-60 group-hover:opacity-100"
             )}
           />
-          <span className="truncate min-w-0 flex-1 block">
+          <span
+            className="truncate min-w-0 flex-1 block"
+            title={thread.title || "Untitled Analysis"}
+          >
             {thread.title || "Untitled Analysis"}
           </span>
         </Link>
