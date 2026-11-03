@@ -4,7 +4,7 @@
 
 ## Master Table of Contents & Technical Study Roadmap
 
-This document serves as the comprehensive engineering specification, architectural blueprint, and interview preparation manual for **Document Assistant**. Below is the roadmap designed to guide your study sequentially from system topology down to mathematical formulations, empirical benchmarks, and staff-level interview defense.
+This document serves as the comprehensive engineering specification, architectural blueprint, and technical decisions manual for **Document Assistant**. Below is the roadmap designed to guide your study sequentially from system topology down to mathematical formulations, empirical benchmarks, and first-principles architectural defense.
 
 ```
 STUDY PATHWAY (RECOMMENDED SEQUENCE):
@@ -31,8 +31,8 @@ STUDY PATHWAY (RECOMMENDED SEQUENCE):
 │   ├─► Section 12: Verification & Reproducibility Guide (Running Benchmarks & Pytests)  │
 │   └─► Section 13: High-Availability Waterfall Cascade (2,160+ RPD Multi-Key/Model)     │
 ├────────────────────────────────────────────────────────────────────────────────────────┤
-│ MODULE V: SENIOR TECHNICAL INTERVIEW MASTERY (SECTION 14)                              │
-│   └─► Section 14: Senior Engineering Interview Guide (Q1–Q15 Deep Institutional Q&A)   │
+│ MODULE V: ARCHITECTURAL DECISIONS & TECHNICAL QUESTIONNAIRE (SECTION 14)               │
+│   └─► Section 14: Deep-Dive Architectural Questionnaire (Q1–Q27 First-Principles Q&A) │
 └────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -52,7 +52,7 @@ STUDY PATHWAY (RECOMMENDED SEQUENCE):
 11. [11. Production Zero-Cost Deployment Architecture ($0.00 / Month)](#11-production-zero-cost-deployment-architecture-000--month) — *Permanent $0.00 cloud deployment across Vercel Edge, Render, Supabase PostgreSQL, and Google AI Studio.*
 12. [12. Verification & Reproducibility Guide](#12-verification--reproducibility-guide) — *Step-by-step commands to run the live empirical benchmark suite and the 64-test backend test suite.*
 13. [13. High-Availability Multi-Model & Multi-Key Cascade (2,160+ RPD Architecture)](#13-high-availability-multi-model--multi-key-cascade-2160-rpd-architecture) — *The 2D waterfall matrix (7 models × 2 keys = 2,160+ requests/day), Model Fidelity Invariant, and real-time SSE route telemetry.*
-14. [14. Senior Engineering Technical Interview Mastery Guide (Deep-Dive Q&A)](#14-senior-engineering-technical-interview-mastery-guide-deep-dive-qa) — *26 institutional-grade interview questions & answers across retrieval, data engineering, validation, UI latency engineering, and production scaling.*
+14. [14. Deep-Dive Architectural & Engineering Decisions Questionnaire (First-Principles Q&A)](#14-deep-dive-architectural--engineering-decisions-questionnaire-first-principles-qa) — *27 deep-dive technical questions & answers dissecting retrieval trade-offs, data engineering, validation proofs, UI latency engineering, and production scaling.*
 
 ---
 
@@ -100,7 +100,7 @@ Document Assistant solves this intake bottleneck by transforming static SEC EDGA
 4. **High-Availability 2D Waterfall Failover (2,160+ Free Daily Headroom)**: A dual-key and 5-model failover matrix guaranteeing zero user-facing errors or demand warnings. On quota exhaustion, the engine rotates API keys for the selected model first, cascading to fallback models only when both keys are exhausted, scaling free-tier capacity to 2,160+ requests/day at $0.00.
 
 > [!NOTE]
-> **Section Transition (Flow to Section 1.5)**: Before analyzing the complex system topology, Section 1.5 breaks down every single foundational term, mathematical concept, and database index in plain English so that any engineer or interviewer can understand the project from the ground up.
+> **Section Transition (Flow to Section 1.5)**: Before analyzing the complex system topology, Section 1.5 breaks down every single foundational term, mathematical concept, and database index in plain English so that any engineer or technical evaluator can understand the project from first principles.
 
 ---
 
@@ -112,7 +112,7 @@ This section is your **conceptual decoder ring**. Every core concept is broken d
 1. **What is it?** (Its technical identity: is it an algorithm, an index, a database feature, or an architectural pattern?)
 2. **Plain-English Definition & Real-World Analogy** (How to explain it to someone with zero AI background).
 3. **Why Document Assistant Uses It** (The exact financial engineering justification).
-4. **The 30-Second Interview Answer** (Exactly what to say out loud to an interviewer to sound senior, knowledgeable, and articulate).
+4. **The Core Engineering Principle** (The concise first-principles architectural summary of why this concept matters in system design).
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────────────────┐
@@ -156,7 +156,7 @@ This section is your **conceptual decoder ring**. Every core concept is broken d
 - **Plain-English Meaning**: An architecture where the AI is strictly forbidden from answering financial questions from its pre-trained memory. Instead, it first searches a private, audited database of SEC 10-K filings to find the exact pages (**Retrieval**), attaches those pages to the user's prompt (**Augmentation**), and instructs the model to synthesize the final answer strictly using those source pages (**Generation**).
 - **Everyday Analogy**: An **Open-Book Exam**. If you ask a student to guess Apple's 2021 Services Gross Margin from memory (Closed-Book), they will likely guess a number that sounds plausible but is completely wrong. If you instead hand them Apple's official 2021 10-K filing opened to page 34 and say *"Only answer using this table"* (Open-Book RAG), they will read the exact number with 100% accuracy.
 - **Why Document Assistant Uses It**: In institutional finance, a single hallucinated digit in a discounted cash flow (DCF) model can cost millions of dollars. RAG eliminates memory hallucinations by forcing the model to cite audited SEC filings.
-- **Interview Talking Point**: *"We use RAG to decouple static parametric memory from verified knowledge retrieval. The LLM acts purely as an analytical reasoning and synthesis engine over dynamically retrieved, audited SEC 10-K passages."*
+- **Core Engineering Principle**: *"We use RAG to decouple static parametric memory from verified knowledge retrieval. The LLM acts purely as an analytical reasoning and synthesis engine over dynamically retrieved, audited SEC 10-K passages."*
 
 ---
 
@@ -165,7 +165,7 @@ This section is your **conceptual decoder ring**. Every core concept is broken d
 - **Plain-English Meaning**: A vector is a list of 768 decimal numbers (e.g., `[0.0142, -0.0512, 0.0891, ...]`) generated by an embedding model (`gemini-embedding-001`). It maps the **conceptual meaning** of a sentence into a 768-dimensional mathematical space. Sentences that mean the same thing are placed right next to each other, even if they use completely different words.
 - **Everyday Analogy**: **GPS Coordinates for Meaning**. In the physical world, your house has GPS coordinates `(Latitude, Longitude)`. If two houses are in the same neighborhood, their GPS numbers are almost identical. In 768-dimensional "thought space", the sentence *"Apple's money spent on factories and machines"* and the sentence *"Purchases of property, plant, and equipment"* receive almost identical 768-dimensional coordinates because they share the exact same financial concept.
 - **Why Document Assistant Uses It**: Financial analysts often use colloquial questions (*"How much did Google spend on server infrastructure?"*). The SEC filing uses formal accounting language (*"Capital expenditures related to technical infrastructure"*). Embeddings bridge this language gap by matching meaning rather than exact keywords.
-- **Interview Talking Point**: *"Embeddings project natural language onto a continuous 768-dimensional latent semantic manifold where conceptual proximity is measured geometrically via cosine distance."*
+- **Core Engineering Principle**: *"Embeddings project natural language onto a continuous 768-dimensional latent semantic manifold where conceptual proximity is measured geometrically via cosine distance."*
 
 ---
 
@@ -177,7 +177,7 @@ This section is your **conceptual decoder ring**. Every core concept is broken d
   - If you measure the **angle** between the two beams, it is $0^\circ$ (they point in the exact same direction!). That is **Cosine Distance**.
   - If you measure the physical distance between the tips of the two light beams, they are hundreds of feet apart because one beam is short and one is long. That is **Euclidean Distance** ($L_2$).
 - **Why Document Assistant Uses Cosine Distance**: In SEC filings, a user query is typically 5 to 10 words, while an ingested document chunk is 400 to 800 words. Euclidean distance mistakenly treats them as "far apart" simply because of document length. Cosine distance normalizes the length, focusing purely on whether the two texts are talking about the same topic.
-- **Interview Talking Point**: *"In document retrieval, text lengths vary dramatically. Cosine distance normalizes vector magnitude, evaluating directional alignment rather than Euclidean length, ensuring invariant matching between short queries and long document passages."*
+- **Core Engineering Principle**: *"In document retrieval, text lengths vary dramatically. Cosine distance normalizes vector magnitude, evaluating directional alignment rather than Euclidean length, ensuring invariant matching between short queries and long document passages."*
 
 ---
 
@@ -202,7 +202,7 @@ This section is your **conceptual decoder ring**. Every core concept is broken d
 - **The Key Parameters ($M=16$, `ef_construction=64`)**:
   - $M = 16$: Every chunk vector maintains 16 bidirectional connections to its closest neighbors.
   - `ef_construction = 64`: During index creation, PostgreSQL evaluates 64 candidate neighbors at each hop to build a resilient graph structure.
-- **Interview Talking Point**: *"HNSW builds a multi-layer skip-list graph over high-dimensional vector space. It replaces $O(N)$ brute-force scans with $O(\log N)$ greedy graph routing, delivering sub-5ms search latencies with over 98% recall on our Supabase PostgreSQL instance."*
+- **Core Engineering Principle**: *"HNSW builds a multi-layer skip-list graph over high-dimensional vector space. It replaces $O(N)$ brute-force scans with $O(\log N)$ greedy graph routing, delivering sub-5ms search latencies with over 98% recall on our Supabase PostgreSQL instance."*
 
 ---
 
@@ -211,7 +211,7 @@ This section is your **conceptual decoder ring**. Every core concept is broken d
 - **Plain-English Meaning**: Searching for exact character sequences, word stems, and specific numbers.
 - **Everyday Analogy**: The **`Ctrl + F`** keyboard shortcut. If you press `Ctrl + F` and type `"Item 7A"`, it instantly jumps to the exact page where those exact characters appear.
 - **Why Document Assistant Uses It**: Vector embeddings suffer from **"numerical blindness"**: the vector for `"$96,169 million"` and the vector for `"$96,170 million"` are mathematically 99.9% identical. If an analyst asks for Apple's exact 2024 iPhone revenue, dense vector search might return the 2023 number because the words around it are identical. Sparse search matches the exact number `96,169` without error.
-- **Interview Talking Point**: *"Dense vector search provides conceptual semantic recall, while sparse lexical search guarantees precision on exact numerical figures, statutory Item headers, and ticker symbols."*
+- **Core Engineering Principle**: *"Dense vector search provides conceptual semantic recall, while sparse lexical search guarantees precision on exact numerical figures, statutory Item headers, and ticker symbols."*
 
 ---
 
@@ -226,7 +226,7 @@ This section is your **conceptual decoder ring**. Every core concept is broken d
   - The **GIN Index** works like the **alphabetical index at the back of a textbook**: when you look up `'revenu'`, it immediately gives you a list of all 1,200 chunk IDs containing that word.
   - `ts_rank_cd` measures **how close the words are to each other**. If you search for *"Traffic Acquisition Costs"*, a paragraph where those three words are right next to each other gets a high score. A paragraph where *"Traffic"* is on line 1 and *"Costs"* is 40 lines later gets a low score.
 - **Why Document Assistant Uses It**: Financial accounting terms are multi-word phrases (e.g. *"remaining performance obligations"* or *"unearned revenue"*). Cover Density ensures that chunks discussing the exact accounting concept rank far above chunks that merely mention the word "revenue" in passing.
-- **Interview Talking Point**: *"We use PostgreSQL's GIN-indexed tsvector with ts_rank_cd cover density ranking because financial queries demand phrase proximity scoring rather than naive bag-of-words term frequency."*
+- **Core Engineering Principle**: *"We use PostgreSQL's GIN-indexed tsvector with ts_rank_cd cover density ranking because financial queries demand phrase proximity scoring rather than naive bag-of-words term frequency."*
 
 ---
 
@@ -241,7 +241,7 @@ This section is your **conceptual decoder ring**. Every core concept is broken d
   - RRF takes their rank positions and calculates: $\text{Score} = \frac{1}{60 + \text{Rank}_A} + \frac{1}{60 + \text{Rank}_B}$.
   - If a document is ranked #1 by both judges, it gets the highest possible score: $\frac{1}{61} + \frac{1}{61} = 0.03278$.
 - **Why $k=60$**: It is a mathematical dampener. It prevents an outlier document that was ranked #1 by dense search but #500 by sparse search from dominating the final results. It strongly rewards **consensus** between both branches.
-- **Interview Talking Point**: *"RRF eliminates the fragile score calibration of min-max normalization by operating strictly on ordinal rank positions, utilizing a smoothing factor of $k=60$ to reward multi-modal consensus."*
+- **Core Engineering Principle**: *"RRF eliminates the fragile score calibration of min-max normalization by operating strictly on ordinal rank positions, utilizing a smoothing factor of $k=60$ to reward multi-modal consensus."*
 
 ---
 
@@ -250,7 +250,7 @@ This section is your **conceptual decoder ring**. Every core concept is broken d
 - **Plain-English Meaning**: When our retrieval engine finds a relevant filing chunk, it automatically runs a single SQL query to fetch the chunk that came immediately before it (`prev_chunk_id`) and the chunk that came immediately after it (`next_chunk_id`).
 - **Everyday Analogy**: **Zooming Out a Camera Lens**. If you take a close-up photo of a financial table, the camera might capture the numbers but cut off the top column headers or the explanatory footnote at the bottom. Neighbor expansion zooms out by one step, letting the AI see the header, the data rows, and the footnote together.
 - **Why Document Assistant Uses It**: SEC 10-K financial tables frequently span 2 to 3 printed pages. Slicing documents into small 500-token chunks is necessary for precise vector search, but without neighbor expansion, the table loses its column titles and footnotes.
-- **Interview Talking Point**: *"Neighbor expansion resolves the classic RAG dilemma between retrieval granularity and reasoning context: we index small chunks for high search precision, but expand to $\pm 1$ neighbor foreign keys at inference time to reconstruct complete financial schedules."*
+- **Core Engineering Principle**: *"Neighbor expansion resolves the classic RAG dilemma between retrieval granularity and reasoning context: we index small chunks for high search precision, but expand to $\pm 1$ neighbor foreign keys at inference time to reconstruct complete financial schedules."*
 
 ---
 
@@ -262,7 +262,7 @@ This section is your **conceptual decoder ring**. Every core concept is broken d
   - *Turn 2*: *"How did that compare to their 2023 revenue?"*
   - The system automatically inherits `AAPL` so the analyst doesn't have to re-type the word "Apple" in every single prompt.
 - **Why We Cap It at 6 Messages (Instead of 50)**: Feeding 50 old messages into an LLM causes **Context Poisoning** and **Ticker Bleed** (the model gets confused between Apple numbers mentioned 10 turns ago and Microsoft numbers asked right now). 6 messages provides conversational continuity while keeping prompt tokens sub-second fast.
-- **Interview Talking Point**: *"We enforce a strict 6-message sliding window with deterministic ticker inheritance, preventing context window bloat and eliminating cross-company ticker bleed during multi-turn research."*
+- **Core Engineering Principle**: *"We enforce a strict 6-message sliding window with deterministic ticker inheritance, preventing context window bloat and eliminating cross-company ticker bleed during multi-turn research."*
 
 ---
 
@@ -271,7 +271,7 @@ This section is your **conceptual decoder ring**. Every core concept is broken d
 - **Plain-English Meaning**: A Python framework that forces the AI model to output its answer as a strictly typed JSON object with pre-defined fields, rather than unstructured conversational text.
 - **Everyday Analogy**: An **Official Government Tax Form**. Instead of giving someone a blank piece of lined paper where they can write anything they want, you hand them an official form with required boxes: Box 1 = Narrative Answer, Box 2 = Array of Citations (Ticker, Year, Page, Quote). If they fail to fill in a required box or put text into a number field, the system rejects the output before it can crash the frontend.
 - **Why Document Assistant Uses It**: The React frontend requires structured citation cards, clickable footnotes, and source metadata drawers. PydanticAI uses Rust-backed Pydantic validation to guarantee that the API returns 100% valid, deterministic JSON on every request.
-- **Interview Talking Point**: *"PydanticAI enforces strict compile-time and runtime type safety on LLM outputs using Pydantic schemas, guaranteeing deterministic frontend rendering of citations, financial tables, and metadata."*
+- **Core Engineering Principle**: *"PydanticAI enforces strict compile-time and runtime type safety on LLM outputs using Pydantic schemas, guaranteeing deterministic frontend rendering of citations, financial tables, and metadata."*
 
 ---
 
@@ -284,7 +284,7 @@ This section is your **conceptual decoder ring**. Every core concept is broken d
   - **Gate 3 (Footnote Alignment)**: Does every `[^1]` marker in the text correspond to an actual citation in the citation drawer?
   - **Gate 4 (Verbatim Substring Check)**: Does the cited quote actually exist word-for-word in the official SEC filing?
 - **What is "Fail-Closed"?**: If any of the 4 gates detects a discrepancy, the system **locks the gate** ("fails closed") and blocks the response. It does not allow a questionable answer to slip through.
-- **Interview Talking Point**: *"Our GroundingValidator operates programmatically rather than relying on self-reflection or LLM-as-a-judge. It enforces a strict fail-closed contract across four deterministic gates in sub-millisecond Python code."*
+- **Core Engineering Principle**: *"Our GroundingValidator operates programmatically rather than relying on self-reflection or LLM-as-a-judge. It enforces a strict fail-closed contract across four deterministic gates in sub-millisecond Python code."*
 
 ---
 
@@ -296,7 +296,7 @@ This section is your **conceptual decoder ring**. Every core concept is broken d
   - **Dimension 2 (Vertical - Models)**: Only if both keys are exhausted does the system cascade down to Gemini 2.5 Flash, then Gemini 2.0 Flash, then Flash Lite.
 - **Everyday Analogy**: A hospital backup power grid with two independent electrical power lines. If Power Line 1 trips, switch to Power Line 2. Only if both city power lines fail do you start the diesel generator.
 - **Why Document Assistant Uses It**: Free-tier Google AI Studio accounts provide generous quotas (e.g. 500 to 1,500 requests/day per key), but have strict per-minute rate limits. The 2D waterfall unlocks 2,160+ free requests/day with 99.9% uptime at **$0.00 cost**.
-- **Interview Talking Point**: *"The 2D waterfall engine preserves user model fidelity by exhausting horizontal API key rotations before cascading vertically across model tiers, achieving enterprise resilience on zero-cost cloud tiers."*
+- **Core Engineering Principle**: *"The 2D waterfall engine preserves user model fidelity by exhausting horizontal API key rotations before cascading vertically across model tiers, achieving enterprise resilience on zero-cost cloud tiers."*
 
 ---
 
@@ -305,7 +305,7 @@ This section is your **conceptual decoder ring**. Every core concept is broken d
 - **Plain-English Meaning**: A real-time connection from the FastAPI backend to the React frontend where text tokens and status updates are sent continuously as they are generated.
 - **Everyday Analogy**: A **Live News Ticker Tape**. Instead of waiting for a news reporter to finish writing an entire 10-page article before you can read anything (traditional HTTP request-response), the words appear on your screen letter-by-letter as they are being typed.
 - **Why Document Assistant Uses It Instead of WebSockets**: WebSockets are bidirectional and heavy—they require custom handshake protocols and dedicated socket server processes. SSE runs over standard HTTP, works seamlessly through firewalls and CDNs, has built-in browser reconnection, and is natively supported by the Vercel AI SDK data stream protocol.
-- **Interview Talking Point**: *"We use Server-Sent Events (SSE) over standard HTTP streaming using the Vercel AI SDK Data Stream protocol, streaming real-time status frames (`2:`), word tokens (`0:`), and citation payloads with minimal memory overhead."*
+- **Core Engineering Principle**: *"We use Server-Sent Events (SSE) over standard HTTP streaming using the Vercel AI SDK Data Stream protocol, streaming real-time status frames (`2:`), word tokens (`0:`), and citation payloads with minimal memory overhead."*
 
 ---
 
@@ -314,7 +314,7 @@ This section is your **conceptual decoder ring**. Every core concept is broken d
 - **Plain-English Meaning**: Showing the user's prompt bubble and a glowing status indicator in the browser at tick 0 (0 milliseconds), while the database conversation thread is created in the background.
 - **Everyday Analogy**: **Instant Table Service at a Restaurant**. The moment you walk into a restaurant, the host immediately seats you and hands you a glass of water (0ms perceived latency). Meanwhile, the host types your party details into the reservation computer in the background. You never feel like you were left waiting at the door.
 - **Why Document Assistant Uses It**: Without optimistic mounting, submitting a question in a new thread caused a 1 to 2 second blank screen delay while the browser waited for Supabase to allocate a thread UUID. Optimistic mounting gives the user instant, snappy feedback.
-- **Interview Talking Point**: *"Optimistic mounting decouples local UI state presentation from remote database persistence, eliminating the 1.5s draft thread creation freeze and achieving 0ms perceived latency."*
+- **Core Engineering Principle**: *"Optimistic mounting decouples local UI state presentation from remote database persistence, eliminating the 1.5s draft thread creation freeze and achieving 0ms perceived latency."*
 
 ---
 
@@ -325,7 +325,7 @@ This section is your **conceptual decoder ring**. Every core concept is broken d
   1. **Top-1 Precision (80.0%)**: Did our search engine put the single best SEC filing chunk in the **very first position (#1)**? In 12 out of 15 queries (80%), the exact answer was the #1 result.
   2. **Top-5 Recall (86.7%)**: Was the correct SEC chunk somewhere in the **Top 5 results**? In 13 out of 15 queries (86.7%), the answer was retrieved in the Top 5.
   3. **MRR@5 (Mean Reciprocal Rank = 0.822)**: A score from 0.0 to 1.0 measuring how close to the top the correct answer was. If the correct answer is at Rank 1, the score is $1/1 = 1.0$. If it is at Rank 2, the score is $1/2 = 0.5$. An MRR of 0.822 proves that almost all correct answers appear in positions #1 or #2.
-- **Interview Talking Point**: *"We validated our hybrid retrieval pipeline against an empirical 15-query ground-truth benchmark on live Supabase data, measuring an 80.0% Top-1 Precision, 86.7% Top-5 Recall, and 0.822 MRR@5."*
+- **Core Engineering Principle**: *"We validated our hybrid retrieval pipeline against an empirical 15-query ground-truth benchmark on live Supabase data, measuring an 80.0% Top-1 Precision, 86.7% Top-5 Recall, and 0.822 MRR@5."*
 
 ---
 
@@ -334,7 +334,7 @@ This section is your **conceptual decoder ring**. Every core concept is broken d
 - **Plain-English Meaning**: AI models do not read human words or individual letters. Instead, they chop text into small syllable-like chunks called **tokens**. For example, the common word `"apple"` is 1 token, but a rare accounting term like `"unearned"` might be split into 2 tokens (`"un"` and `"earned"`). In English, **1 token is approximately $\frac{3}{4}$ of a word** (or 100 tokens $\approx$ 75 words). The **context window** is the total number of tokens the model can read and remember in a single interaction.
 - **Everyday Analogy**: **A Researcher's Desk**. Imagine an equity analyst sitting at a work desk. The size of the desk is the context window. If the desk is small, you can only keep 2 pages open at a time. If the desk is huge (like Google Gemini's 1-million-token window), you can spread out hundreds of pages. However, just like a messy desk, if you spread out 500 unnecessary pages, you will waste time searching for the one sticky note that actually has the answer!
 - **Why Document Assistant Uses It**: We size our document chunks strictly between **600 and 900 tokens** (measured via OpenAI's `tiktoken` with `cl100k_base`). This is the mathematical "Goldilocks zone" for SEC filings: large enough to keep multi-column financial tables intact without cutting rows in half, but small enough to keep vector search precise.
-- **Interview Talking Point**: *"We standardize document chunking between 600 and 900 tokens using OpenAI's cl100k_base tokenizer, striking an optimal balance between table structure preservation and dense vector retrieval granularity."*
+- **Core Engineering Principle**: *"We standardize document chunking between 600 and 900 tokens using OpenAI's cl100k_base tokenizer, striking an optimal balance between table structure preservation and dense vector retrieval granularity."*
 
 ---
 
@@ -351,7 +351,7 @@ This section is your **conceptual decoder ring**. Every core concept is broken d
   - **CIK (Central Index Key)**: A permanent 10-digit number assigned by the SEC to identify a company (e.g. Apple is `0000320193`).
 - **Everyday Analogy**: **An Annual Hospital Medical Audit**. If a company issues marketing press releases, it is like their Instagram profile—everything looks glamorous. A 10-K is an audited medical report and blood test supervised by federal regulators. If executives falsify numbers in a 10-K, they face criminal prosecution.
 - **Why Document Assistant Uses It**: We index 25 audited 10-Ks across 5 tech issuers (AAPL, AMZN, GOOGL, MSFT, NVDA) covering FY2021 through FY2025, specifically prioritizing Items 7 and 8 where the quantitative truth lives.
-- **Interview Talking Point**: *"Our ingestion architecture targets statutory SEC Items 7 and 8 across 25 annual filings, extracting audited financial schedules directly from official EDGAR disclosures."*
+- **Core Engineering Principle**: *"Our ingestion architecture targets statutory SEC Items 7 and 8 across 25 annual filings, extracting audited financial schedules directly from official EDGAR disclosures."*
 
 ---
 
@@ -363,7 +363,7 @@ This section is your **conceptual decoder ring**. Every core concept is broken d
   - **Load**: Generating 768-dimensional embeddings and saving chunks into Supabase PostgreSQL.
 - **Everyday Analogy**: **A Professional Kitchen Prep Station**. You don't dump dirty, unwashed, unpeeled potatoes straight from a muddy farm truck into a guest's soup. The kitchen staff washes them (cleans HTML), peels them (strips boilerplate), slices them into uniform cubes (600–900 token chunks), and stores them in organized, labeled refrigerator containers (PostgreSQL database).
 - **Why Document Assistant Uses It**: SEC tables have complex multi-row headers and merged cells. When a table spans 40 rows, naive splitters cut the table in half, leaving Chunk 2 with bare numbers and zero column titles. Our GFM normalizer **duplicates the header row at the top of every split chunk**, ensuring 100% self-contained quantitative context.
-- **Interview Talking Point**: *"Our ETL pipeline normalizes irregular SEC HTML tables into GFM markdown, programmatically flattening multi-tier headers and duplicating column titles across split chunks to guarantee that every retrieved tabular passage is fully grounded."*
+- **Core Engineering Principle**: *"Our ETL pipeline normalizes irregular SEC HTML tables into GFM markdown, programmatically flattening multi-tier headers and duplicating column titles across split chunks to guarantee that every retrieved tabular passage is fully grounded."*
 
 ---
 
@@ -375,7 +375,7 @@ This section is your **conceptual decoder ring**. Every core concept is broken d
   - **TTFT (Time-to-First-Token)**: The exact elapsed time between an analyst hitting Enter and the very first character appearing on the screen.
 - **Everyday Analogy**: **A Master Chef Reading the Order Ticket**. If a waiter hands the chef a 1-page order slip (compact 5,000-token prompt), the chef reads it in 3 seconds (fast pre-fill) and immediately starts cooking (sub-second TTFT). If the waiter hands the chef a 200-page historical novel (100,000 tokens), the chef spends 20 minutes reading before lighting the stove, leaving the customer starving at the table.
 - **Why Document Assistant Uses It**: We restrict conversational prompt overhead to ~6,000 tokens. This keeps pre-fill latency under **350ms**, ensuring that streaming text starts dancing across the analyst's screen almost instantaneously.
-- **Interview Talking Point**: *"We optimize Time-to-First-Token (TTFT) by capping prompt token volume under 8,000 tokens per turn, keeping transformer pre-fill computation under 350ms on Gemini Flash models."*
+- **Core Engineering Principle**: *"We optimize Time-to-First-Token (TTFT) by capping prompt token volume under 8,000 tokens per turn, keeping transformer pre-fill computation under 350ms on Gemini Flash models."*
 
 ---
 
@@ -384,7 +384,7 @@ This section is your **conceptual decoder ring**. Every core concept is broken d
 - **Plain-English Meaning**: Creating a new connection from a web server to a cloud database requires a network TCP handshake, SSL encryption negotiation, and password authentication, taking 100ms–300ms every time. A **connection pool** keeps a small pool of already-opened, authenticated connections idling in memory, ready to execute queries instantly.
 - **Everyday Analogy**: **A Fleet of Shared Company Cars**. Instead of going to a car dealership to buy a brand-new car every time an employee needs to drive to an off-site meeting and then selling the car when they return (which is slow and wasteful), the company parks 5 cars in the basement garage. Employees borrow a key, make their trip, and park the car back in the garage for the next person to use immediately.
 - **Why Document Assistant Uses It**: Cloud databases like Supabase enforce strict connection limits on free tiers (maximum 60 concurrent connections). If multiple requests opened unmanaged connections, the database would quickly crash with `FATAL: remaining connection slots are reserved`. We configure SQLAlchemy with a `QueuePool` (5 persistent connections, 10 burst connections, 300s recycle) and enable `pool_pre_ping=True` (which sends a tiny `SELECT 1` ping to ensure a connection didn't quietly die before assigning it to a query).
-- **Interview Talking Point**: *"To prevent connection starvation on Supabase's 60-connection free tier, we configure SQLAlchemy's QueuePool with pool_size=5, max_overflow=10, pool_recycle=300, and pool_pre_ping=True to transparently recover from cloud firewall socket drops."*
+- **Core Engineering Principle**: *"To prevent connection starvation on Supabase's 60-connection free tier, we configure SQLAlchemy's QueuePool with pool_size=5, max_overflow=10, pool_recycle=300, and pool_pre_ping=True to transparently recover from cloud firewall socket drops."*
 
 ---
 
@@ -396,7 +396,7 @@ This section is your **conceptual decoder ring**. Every core concept is broken d
   - **The `key` Prop**: A unique identifier given to a React component. When the `key` changes, React knows to completely destroy the old component and mount a fresh, brand-new instance from scratch.
 - **Everyday Analogy**: **A Modern Digital Stadium Scoreboard**. In the 1920s, updating a baseball score required physically taking down large wooden number boards and hanging new ones (full page reload). A modern LED stadium scoreboard instantly updates only the specific digital light pixels for the score, leaving the rest of the stadium displays untouched (React Virtual DOM update).
 - **Why Document Assistant Uses It**: When an analyst clicks "+ New Research Thread", we change the component key (`key={threadId ? 'thread-' + threadId : 'draft-' + draftId}`). React immediately discards old message states and citation inspection sheets, mounting a clean draft canvas in **0ms** without a jarring page refresh.
-- **Interview Talking Point**: *"We leverage React's reconciliation algorithm and dynamic component keys to execute deterministic state purges upon thread transitions, eliminating memory leaks and visual state retention across multi-turn research sessions."*
+- **Core Engineering Principle**: *"We leverage React's reconciliation algorithm and dynamic component keys to execute deterministic state purges upon thread transitions, eliminating memory leaks and visual state retention across multi-turn research sessions."*
 
 ---
 
@@ -409,7 +409,7 @@ This section is your **conceptual decoder ring**. Every core concept is broken d
   - *The Forgetful Waiter (N+1)*: Brings water to the table, walks all the way back to the kitchen to get 1 fork, walks back to the kitchen to get the 2nd fork, and repeats this 10 times. Dinner takes an hour to start!
   - *The Smart Waiter (Relational Bundling)*: Brings all 10 plates, forks, and glasses together on a single rolling cart in one trip.
 - **Why Document Assistant Uses It**: Previously, opening a thread fired 1 request for messages, followed by 5 to 10 separate HTTP requests to fetch citation snippets. We collapsed this into **1 single relational database query** using Supabase PostgREST embedding (`chat_messages(*, message_citations(*))`), dropping network loading times from 1.5 seconds down to **110 milliseconds**.
-- **Interview Talking Point**: *"We eliminated client-side N+1 network waterfalls by using Supabase PostgREST relational foreign key joins to bundle messages and citations into a single 110ms payload, backed by an in-memory SWR cache for instant conversational switching."*
+- **Core Engineering Principle**: *"We eliminated client-side N+1 network waterfalls by using Supabase PostgREST relational foreign key joins to bundle messages and citations into a single 110ms payload, backed by an in-memory SWR cache for instant conversational switching."*
 
 ---
 
@@ -418,7 +418,7 @@ This section is your **conceptual decoder ring**. Every core concept is broken d
 - **Plain-English Meaning**: A client-side animation controller running at 60 frames per second that smoothly advances the progress bar (1%, 2%, 3%... 88%) and gently slows down ("asymptotically eases") if the AI takes longer to think, so the progress bar never freezes, never skips steps, and never lies to the user.
 - **Everyday Analogy**: **The Airport Loading Screen / Elevator Floor Indicator**. If an elevator display stays completely frozen between Floor 14 and 15 for two minutes, you panic and think the cables snapped. If the floor indicator smoothly climbs and softly breathes with a glowing status pulse, you relax knowing the elevator is operating safely.
 - **Why Document Assistant Uses It**: LLMs like Gemini take 3 to 6 seconds to analyze complex financial schedules and produce JSON. Naive progress bars jumped abruptly from 25% to 75% and sat frozen. Our controller runs on `requestAnimationFrame` with a 30ms tick-rate, creating a silky-smooth, continuous progression that sweeps crisply to 100% the exact millisecond the answer is ready.
-- **Interview Talking Point**: *"We eliminate jarring progress freezes by implementing an asymptotic easing animation controller on requestAnimationFrame, decoupling visual telemetry pacing from backend latency while maintaining strict adherence to server-emitted pipeline stages."*
+- **Core Engineering Principle**: *"We eliminate jarring progress freezes by implementing an asymptotic easing animation controller on requestAnimationFrame, decoupling visual telemetry pacing from backend latency while maintaining strict adherence to server-emitted pipeline stages."*
 
 ---
 
@@ -427,7 +427,7 @@ This section is your **conceptual decoder ring**. Every core concept is broken d
 - **Plain-English Meaning**: **FINRA** (*Financial Industry Regulatory Authority*) is the government-authorized organization that oversees all US brokerage firms and registered equity analysts. **Rule 2210** dictates that all financial communications must be fair, balanced, factual, and strictly prohibits making exaggerated claims, promising future returns, or distributing unauthorized price targets.
 - **Everyday Analogy**: **A Pharmacist Refusing to Hand Out Unprescribed Medicine**. If a customer walks into a pharmacy and says *"Give me whatever pill will make me live to 100"*, the pharmacist will politely refuse: *"By federal law, I can only dispense verified, doctor-prescribed medications."*
 - **Why Document Assistant Uses It**: If an analyst types *"Should I buy Nvidia stock?"* or *"What is your price target for Apple?"*, Document Assistant immediately intercepts the question under **Category A**, returning a compliant refusal notice explaining that its mandate is strictly to analyze historical audited SEC filings, never to dispense speculative trading recommendations.
-- **Interview Talking Point**: *"To maintain compliance with FINRA Rule 2210 and institutional research standards, our Scope Categorization engine deterministically intercepts forward-looking price targets and stock recommendations, enforcing strict factual disclosure boundaries."*
+- **Core Engineering Principle**: *"To maintain compliance with FINRA Rule 2210 and institutional research standards, our Scope Categorization engine deterministically intercepts forward-looking price targets and stock recommendations, enforcing strict factual disclosure boundaries."*
 
 ---
 
@@ -440,7 +440,7 @@ This section is your **conceptual decoder ring**. Every core concept is broken d
   - **Altman Z-Score**: A statistical formula combining 5 balance sheet ratios to calculate the probability that a corporation will go bankrupt within two years ($Z > 2.99$ = financially safe; $Z < 1.81$ = high bankruptcy distress).
 - **Everyday Analogy**: **Appraising an Apartment Building Before Buying**. If you want to buy a rental property, you don't just guess a price based on its paint color. You calculate how much rent it will produce over the next decade (Cash Flows), subtract mortgage interest and property taxes (WACC), and figure out exactly what price makes financial sense to pay today (DCF).
 - **Why Document Assistant Uses It**: In addition to SEC 10-K retrieval, analysts use Document Assistant as an analytical productivity assistant (Category C & E) to verify Excel modeling formulas (`=XIRR()`), compute cost of capital, and verify financial math. The system formats these using KaTeX display math cards while strictly forbidding fabricated SEC citation badges on general mathematical theory.
-- **Interview Talking Point**: *"Our architecture supports institutional financial modeling utilities (DCF, WACC, CAPM, Altman Z) via a dual-channel grounding invariant, synthesizing quantitative theory with LaTeX typography while reserving SEC citation provenance strictly for audited disclosures."*
+- **Core Engineering Principle**: *"Our architecture supports institutional financial modeling utilities (DCF, WACC, CAPM, Altman Z) via a dual-channel grounding invariant, synthesizing quantitative theory with LaTeX typography while reserving SEC citation provenance strictly for audited disclosures."*
 
 ---
 
@@ -1579,7 +1579,7 @@ Before proceeding to our second successful run, we tested an intermediate hypoth
 ---
 
 #### Metric Analysis: Why Absolute Gain vs. Relative Gain Both Matter
-When presenting these benchmarks on a resume or in an institutional technical review:
+When evaluating these benchmarks in an institutional technical review or system evaluation:
 1. **Absolute Gain (+20.0 percentage points: 60.0% -> 80.0%)**:
    - Demonstrates the tangible, operational improvement: 3 additional queries out of every 15 that previously required analysts to scroll down to Rank 2 or 3 now appear instantly at the very top of their screen.
 2. **Relative Gain (+33.3% improvement: $\frac{80.0 - 60.0}{60.0} = 33.33\%$)**:
@@ -1709,13 +1709,13 @@ User Query Submitted (e.g. Model = Gemini 3 Flash)
 - **Glassmorphic Callout Styler** (`MessageItem.tsx`): Uses a custom blockquote parser to format markdown `> [!WARNING]` and system notifications into elegant amber-bordered cards (`border-amber-500/35 bg-amber-500/10`) with `AlertTriangle` icons, eliminating unformatted markdown text and duplicate error banners.
 
 > [!NOTE]
-> **Section Transition (Flow to Section 14)**: Having mastered the entire end-to-end architecture, Section 14 provides the definitive Senior Engineering Technical Interview Mastery Guide, dissecting 15 deep-dive questions and institutional answers across the four core domains.
+> **Section Transition (Flow to Section 14)**: Having mastered the entire end-to-end architecture, Section 14 provides the definitive Deep-Dive Architectural Questionnaire, dissecting 27 first-principles questions and institutional answers across retrieval, data engineering, validation, UI latency engineering, and production scaling.
 
 ---
 
-## 14. Senior Engineering Technical Interview Mastery Guide (Deep-Dive Q&A)
+## 14. Deep-Dive Architectural & Engineering Decisions Questionnaire (First-Principles Q&A)
 
-This section provides an institutional-grade technical preparation guide specifically engineered for senior systems, machine learning, and AI infrastructure interviews. It reverse-engineers the deepest questions a Staff / Principal Engineer, AI Architect, or Quantitative Systems Director would ask after reviewing this project on an engineering resume.
+This section provides a rigorous, first-principles technical questionnaire dissecting the deepest architectural decisions, trade-offs, failure modes, and engineering invariants of Document Assistant. Each inquiry examines why specific design paths were chosen over alternatives across retrieval, data engineering, validation, UI latency engineering, and production scaling.
 
 ---
 
@@ -2673,7 +2673,7 @@ To deliver a smooth `1%, 2%, 3%, 4%... 100%` progress experience without floodin
        - `> 88%`: Asymptotic breathing micro-ticks (600ms interval up to 92%) so that even during long 8-second generation bursts, the ticker continuously breathes and never appears frozen.
      - *88% ➔ 100% (Instant 20ms Sweep)*: Once Gemini returns and the 4 validation gates pass, target snaps to 100%, sweeps at +4% per frame, holds for 250ms, and reveals the answer.
 
-3. **Interview Takeaway**:
+3. **Core Engineering Invariant**:
    *"Never derive distributed system state from a client-side visual interpolation float. In asynchronous AI streaming pipelines, user-facing stage labels must remain strictly anchored to authoritative server events, while visual progress tickers must employ latency-weighted asymptotic velocity decay to maintain perceived responsiveness across highly asymmetrical workloads."*
 
 ---
@@ -2750,7 +2750,7 @@ To deliver a smooth `1%, 2%, 3%, 4%... 100%` progress experience without floodin
      $$	ext{messages} \leftarrow [\;], \quad 	ext{activeThreadId} \leftarrow 	ext{undefined}, \quad 	ext{pipelineStatus} \leftarrow 	ext{null}, \quad 	ext{isStreaming} \leftarrow 	ext{false}$$
      Simultaneously, [`ChatArea.tsx`](frontend/src/components/chat/ChatArea.tsx) resets citation inspection sheets and turn version maps, immediately exposing fresh rotating starter inquiries.
 
-3. **Interview Takeaway**:
+3. **Core Engineering Invariant**:
    *"Whenever you manipulate native browser history (`replaceState`) to bypass framework component unmounting in high-frequency streaming applications, you must establish an explicit Event-Driven Synchronization Bus (`CustomEvent`) between data-fetching hooks and navigational controls. Never gate user-intent actions (like 'New Thread') behind declarative router parameters that may have fallen out of sync with imperative window state."*
 
 ---
@@ -3067,3 +3067,54 @@ To deliver a smooth `1%, 2%, 3%, 4%... 100%` progress experience without floodin
      *`Auto-Routed: Gemini 2.0 Flash → Gemini 3.5 Flash Lite (endpoint routed to high-capacity tier)`*.
    - **Model Selector Modernization**:
      In [`MessageInput.tsx`](frontend/src/components/chat/MessageInput.tsx), the active live endpoints (`Gemini 3.5 Flash Lite (1,500 RPD Workhorse)`, `Gemini 3 Flash (Flagship)`, `Gemini Flash Lite (Lowest Latency)`) are surfaced explicitly as first-class options with transparent latency and quota tags, eliminating unexpected routing from the outset."
+---
+
+#### Question 27: Is it valid to compare Document Assistant against Tier-1 commercial systems (AlphaSense, BloombergGPT) and FinanceBench on a 25-filing corpus, and how does the architecture address scale, distractor chunks, and domain boundedness in technical reviews?
+
+> **Beginner's Plain-English Intuition & Real-World Analogy:**
+> - **The Core Problem**: In our benchmark table, we compare our performance numbers against **FinanceBench (Patronus AI)** and multi-billion-dollar commercial platforms like **BloombergGPT** and **AlphaSense**.
+>   - A rigorous architectural evaluation might challenge: *"Document Assistant only indexes 25 filings (2,793 chunks), while AlphaSense indexes millions of companies worldwide. Isn't this corpus too small to compare with Bloomberg?"*
+>   - A naive answer (*"Yes, our model is better than Bloomberg!"*) ignores the fundamental technical distinction between open-world search and closed-domain search.
+> - **Everyday Analogy**: **The Specialized Eye Surgery Pod vs. The City-Wide Trauma Hospital**.
+>   - Think of **AlphaSense / Bloomberg** as a 5,000-bed metropolitan trauma hospital. They handle brain surgery, gunshot wounds, burn wards, and broken bones for 50,000 patients a day ($100,000+ per procedure).
+>   - Think of **Document Assistant** as a specialized laser eye surgery clinic. It only does one thing: laser eye surgery for 5 specific conditions (SEC 10-K statutory filings across 5 Big Tech firms).
+>   - If the clinic claims: *"We replace the entire metropolitan hospital!"*, doctors will laugh.
+>   - But if the clinic states: *"On laser eye surgery, our precision matches the nation's top hospital (0% error rate), but we deliver it at $0 cost because we don't carry the trauma hospital's overhead"*, that is 100% accurate, scientifically sound, and deeply impressive.
+> - **The Engineering Solution**: We clearly distinguish between **direct scientific baselines** (FinanceBench on SEC 10-Ks, where table structure is identical) versus **commercial quality ceilings** (AlphaSense / Bloomberg, which represent institutional Wall Street standards), while proving that our 0% hallucination rate is a deterministic software guarantee (4-Gate fail-closed validator) rather than an artifact of a small dataset.
+>
+> **Technical Terms & Acronyms Decoder:**
+> - **Distractor Chunks**: Passages in a vector store that share similar financial keywords or vector proximity with a user query, but belong to an irrelevant company, wrong fiscal year, or non-pertinent accounting note. As a corpus grows from $10^3$ to $10^7$ chunks, distractor chunk density increases exponentially.
+> - **Closed-Domain (Coverage Pod) vs. Open-Domain**: A *closed-domain* system indexes a curated, bounded universe of documents (e.g. 25 statutory 10-Ks for an equity research coverage pod). An *open-domain* system indexes continuously evolving, heterogeneous internet-scale documents across hundreds of thousands of entities.
+> - **FinanceBench**: The authoritative industry benchmark published by Patronus AI specifically to test LLMs on complex numerical, tabular, and textual reasoning over SEC Form 10-K annual filings.
+> - **Deterministic Invariant vs. Probabilistic Behavior**: A *probabilistic* system relies on an LLM hoping not to hallucinate; a *deterministic invariant* uses rigid programmatic gates (set-intersection of chunk UUIDs, ticker regex verification, verbatim table cell matching) that physically block unverified claims from reaching the client.
+
+##### Institutional Engineering Answer:
+"When presenting empirical retrieval and grounding benchmarks in an institutional architecture review, conflating bounded coverage universes with open-world web-scale retrieval is an amateur failure mode. A senior engineer addresses the nuances of corpus scale, distractor density, and baseline validity through four rigorous architectural dimensions:
+
+1. **The Direct Apples-to-Apples Scientific Baseline (FinanceBench & Naive RAG)**:
+   - **Why FinanceBench is Valid**: FinanceBench (developed by Patronus AI) is specifically designed to measure LLM accuracy on SEC Form 10-K annual filings. Its questions demand multi-year CAGR calculations, segment margin extractions, and footnote disclosures.
+   - **The Universal Tabular Failure Mode**: The primary reason naive RAG achieves only ~35% Top-1 precision and suffers an 18%–25% hallucination rate on SEC filings is **not corpus scale—it is tabular structural destruction**. Standard 1,000-character chunkers slice through multi-column HTML/ASCII balance sheets, splitting fiscal years across chunks and pairing 2022 revenues with 2024 headers.
+   - **The Architectural Proof**: Our GFM table normalization (`sec_table_cleaner.py`), Item 7/8 statutory boundary chunking (`chunker.py`), and Hybrid Reciprocal Rank Fusion ($k=60$) solve the exact failure mode identified by FinanceBench. Whether the corpus contains 25 filings or 500 filings, a system that cannot parse tables will fail on both; our pipeline proves architectural superiority on the core document schema.
+
+2. **The Distractor Density Curve & Bounded Pod Architecture**:
+   - **The Distractor Scaling Law**: In information retrieval, retrieval difficulty scales with **distractor density**:
+     $$\text{Distractor Probability} \propto \log(N_{\text{chunks}})$$
+     In an enterprise system like AlphaSense with $10^7$ chunks across 50,000 tickers, the probability of retrieving a near-duplicate chunk describing 'data center revenue growth' for an unrelated company is substantially higher than in a 2,793-chunk pod.
+   - **The Pod Architecture Rationale**: Document Assistant is deliberately architected not as a global search engine, but as an **institutional research pod** (the exact operational unit of sell-side equity analysts, who cover 5 to 15 companies in a specific sector). In institutional practice, equity pods prefer dedicated, high-precision vector indices over noisy, monolithic global indices to minimize cross-entity contamination.
+
+3. **Deterministic 4-Gate Grounding vs. Probabilistic Hallucination**:
+   - In commercial marketing, systems boast '<1% hallucinations' based on probabilistic fine-tuning.
+   - In Document Assistant, the **100% Grounding Pass Rate (0% Hallucinations)** is **not a function of a small corpus—it is an algorithmic guarantee enforced by the 4-Gate Fail-Closed Validator**:
+     - *Gate 1 (UUID Provenance)*: Set-intersection programmatically strips any citation whose UUID was not in the retrieved top-$k$ set ($C \subseteq R$).
+     - *Gate 2 (Ticker Integrity)*: Rejects citations where ticker metadata does not match the active query entity.
+     - *Gate 3 (Footnote Sync)*: Enforces 1-to-1 parity between text markers `[^1]` and payload citations.
+     - *Gate 4 (Verbatim Substring & Cell Match)*: Verifies extracted numbers exist verbatim in source filing cells.
+   - Even if the corpus were scaled to 100,000 chunks, Gate 1 through Gate 4 would still physically prevent ungrounded claims from being emitted to the analyst.
+
+4. **First-Principles Architectural Synthesis & Technical Rationale**:
+   When evaluating the scope and validity of the benchmark comparison, the foundational rationale is:
+   > *'Document Assistant is architected as a specialized, zero-cost equity research pod rather than an open-world multi-asset search engine.*
+   > 
+   > *On our coverage universe of 25 SEC 10-Ks, standard RAG setups fail severely because they destroy financial tables and hallucinate numbers (12%–25% error rate on FinanceBench).*
+   > 
+   > *Our benchmarks demonstrate that by engineering domain-specific preprocessing (GFM table flattening, Item boundary chunking, and Hybrid RRF) paired with a programmatic 4-Gate fail-closed validator, you can achieve commercial-grade precision and zero hallucinations on statutory SEC disclosures while operating on a permanent $0.00/month cloud topology.'*"
