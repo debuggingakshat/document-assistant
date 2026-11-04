@@ -6,7 +6,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Copy,
-  CornerDownLeft,
+  CornerDownRight,
   ExternalLink,
   FileSpreadsheet,
   RotateCw,
@@ -932,66 +932,6 @@ export const MessageItem = memo(function MessageItem({
               </div>
             </div>
           )}
-
-          {/* Dynamic Contextual Follow-Up Chips ("Smart Research Prompts") */}
-          {!isUser &&
-            isLatestAssistantTurn &&
-            !isStreamingLast &&
-            message.suggested_followups &&
-            message.suggested_followups.length > 0 && (
-              <div className="mt-3.5 pt-3 border-t border-border/50">
-                <div className="mb-2 select-none">
-                  <span className="text-[10.5px] font-semibold text-muted-foreground uppercase tracking-wider font-mono">
-                    Suggested Follow-Ups
-                  </span>
-                </div>
-
-                <div className="flex flex-col gap-1.5 sm:flex-row sm:flex-wrap">
-                  {message.suggested_followups.map((promptText, pIdx) => {
-                    const isLoaded = loadedPrompt === promptText
-                    return (
-                      <button
-                        key={pIdx}
-                        type="button"
-                        onClick={() => {
-                          window.dispatchEvent(
-                            new CustomEvent("meridian_populate_input", {
-                              detail: { text: promptText },
-                            })
-                          )
-                          setLoadedPrompt(promptText)
-                          setTimeout(() => {
-                            setLoadedPrompt((curr) => (curr === promptText ? null : curr))
-                          }, 2000)
-                        }}
-                        className={cn(
-                          "group relative flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left text-xs transition-all cursor-pointer shadow-2xs",
-                          isLoaded
-                            ? "border-primary bg-primary/10 text-primary font-medium"
-                            : "border-border/70 bg-muted/30 text-foreground/90 hover:border-foreground/30 hover:bg-muted/70 hover:shadow-xs active:scale-[0.99]"
-                        )}
-                        title="Click to populate query in editor"
-                      >
-                        <span className="line-clamp-2 leading-snug min-w-0">
-                          {promptText}
-                        </span>
-
-                        <div className="shrink-0 flex items-center ml-1">
-                          {isLoaded ? (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-mono text-primary font-semibold">
-                              <Check className="size-3" />
-                              <span>Loaded</span>
-                            </span>
-                          ) : (
-                            <CornerDownLeft className="size-3 text-muted-foreground/50 transition-colors group-hover:text-foreground" />
-                          )}
-                        </div>
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
         </div>
 
         {/* Assistant Message Actions & Footer Timestamp (Below the answer box) */}
@@ -1064,6 +1004,52 @@ export const MessageItem = memo(function MessageItem({
             )}
           </div>
         )}
+
+        {/* Suggested Follow-Up Questions (Rendered below action bar, Claude-style) */}
+        {!isUser &&
+          isLatestAssistantTurn &&
+          !isStreamingLast &&
+          message.suggested_followups &&
+          message.suggested_followups.length > 0 && (
+            <div className="mt-2.5 flex flex-col gap-1 w-full pl-0.5">
+              {message.suggested_followups.map((promptText, pIdx) => {
+                const isLoaded = loadedPrompt === promptText
+                return (
+                  <button
+                    key={pIdx}
+                    type="button"
+                    onClick={() => {
+                      window.dispatchEvent(
+                        new CustomEvent("meridian_populate_input", {
+                          detail: { text: promptText },
+                        })
+                      )
+                      setLoadedPrompt(promptText)
+                      setTimeout(() => {
+                        setLoadedPrompt((curr) => (curr === promptText ? null : curr))
+                      }, 2000)
+                    }}
+                    className={cn(
+                      "group flex items-start sm:items-center gap-2 rounded-lg px-2 py-1 text-left text-[13px] leading-relaxed transition-colors cursor-pointer w-fit max-w-full",
+                      isLoaded
+                        ? "bg-primary/10 text-primary font-medium"
+                        : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                    )}
+                    title="Click to populate query in editor"
+                  >
+                    {isLoaded ? (
+                      <Check className="size-3.5 text-primary shrink-0 mt-0.5 sm:mt-0" />
+                    ) : (
+                      <CornerDownRight className="size-3.5 text-muted-foreground/60 shrink-0 transition-colors group-hover:text-foreground mt-0.5 sm:mt-0" />
+                    )}
+                    <span className="line-clamp-2">
+                      {promptText}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
 
         {/* User Message Actions & Footer Timestamp (Below the user prompt bubble) */}
         {isUser && message.content && (
