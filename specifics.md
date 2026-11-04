@@ -3066,7 +3066,7 @@ To deliver a smooth `1%, 2%, 3%, 4%... 100%` progress experience without floodin
      Concurrently, the Active Telemetry stepper displays:
      *`Auto-Routed: Gemini 2.0 Flash → Gemini 3.5 Flash Lite (endpoint routed to high-capacity tier)`*.
    - **Model Selector Modernization**:
-     In [`MessageInput.tsx`](frontend/src/components/chat/MessageInput.tsx), the active live endpoints (`Gemini 3.5 Flash Lite (1,500 RPD Workhorse)`, `Gemini 3 Flash (Flagship)`, `Gemini Flash Lite (Lowest Latency)`) are surfaced explicitly as first-class options with transparent latency and quota tags, eliminating unexpected routing from the outset."
+     In [`MessageInput.tsx`](frontend/src/components/chat/MessageInput.tsx), the active live endpoints (`Gemini 3.5 Flash Lite (Recommended)`, `Gemini 3 Flash (Flagship)`, `Gemini Flash Lite (Fastest)`) are surfaced explicitly as first-class options with clean, minimal role badges, eliminating unexpected routing from the outset."
 ---
 
 #### Question 27: Is it valid to compare Document Assistant against Tier-1 commercial systems (AlphaSense, BloombergGPT) and FinanceBench on a 25-filing corpus, and how does the architecture address scale, distractor chunks, and domain boundedness in technical reviews?

@@ -13,32 +13,27 @@ export const FREE_GEMINI_MODELS = [
   {
     id: "gemini-3.5-flash-lite",
     name: "Gemini 3.5 Flash Lite",
-    tag: "1,500 RPD Workhorse",
-    desc: "High-capacity tier: 1,500 daily requests per key & sub-second latency",
+    tag: "Recommended",
   },
   {
     id: "gemini-3-flash-preview",
     name: "Gemini 3 Flash",
     tag: "Flagship",
-    desc: "Frontier reasoning & advanced synthetic disclosures",
   },
   {
     id: "gemini-flash-lite-latest",
     name: "Gemini Flash Lite",
-    tag: "Lowest Latency",
-    desc: "Lightweight quick answers & sub-second latency",
+    tag: "Fastest",
   },
   {
     id: "gemini-2.0-flash",
     name: "Gemini 2.0 Flash",
-    tag: "Ultra Fast",
-    desc: "High-speed response generation (auto-routed to high-quota tier)",
+    tag: "High Speed",
   },
   {
     id: "gemini-2.5-flash",
     name: "Gemini 2.5 Flash",
     tag: "Balanced",
-    desc: "Optimal speed & financial reasoning",
   },
 ] as const
 
@@ -152,7 +147,7 @@ export function MessageInput({ onSend, disabled }: MessageInputProps) {
               align="start"
               side="top"
               sideOffset={8}
-              className="w-68 p-1.5 rounded-2xl border border-zinc-200 bg-white shadow-xl dark:border-[#333333] dark:bg-[#212121] dark:text-[#ececec]"
+              className="w-72 p-1.5 rounded-2xl border border-zinc-200 bg-white shadow-xl dark:border-[#333333] dark:bg-[#212121] dark:text-[#ececec]"
             >
               {FREE_GEMINI_MODELS.map((m) => {
                 const isSelected = m.id === selectedModel
@@ -164,29 +159,32 @@ export function MessageInput({ onSend, disabled }: MessageInputProps) {
                       localStorage.setItem("selected_llm_model", m.id)
                     }}
                     className={cn(
-                      "flex flex-col items-start gap-0.5 rounded-xl px-2.5 py-2 cursor-pointer transition-colors",
+                      "flex items-center justify-between gap-2 rounded-xl px-2.5 py-1.5 cursor-pointer transition-colors",
                       isSelected
                         ? "bg-accent text-accent-foreground font-medium"
                         : "hover:bg-muted/70 dark:hover:bg-[#2c2c2c]"
                     )}
                   >
-                    <div className="flex w-full items-center justify-between">
-                      <span className="text-xs font-medium text-foreground flex items-center gap-1.5">
-                        <img
-                          src="/gemini-logo.png"
-                          alt="Gemini"
-                          className="size-3 object-contain shrink-0"
-                        />
+                    <div className="flex items-center gap-2 min-w-0">
+                      <img
+                        src="/gemini-logo.png"
+                        alt="Gemini"
+                        className="size-3.5 object-contain shrink-0"
+                      />
+                      <span className="text-xs font-medium text-foreground truncate">
                         {m.name}
-                        {isSelected && <Check className="size-3 text-primary shrink-0 ml-1" />}
-                      </span>
-                      <span className="font-mono text-[9px] px-1.5 py-0.2 rounded-md bg-muted text-muted-foreground">
-                        {m.tag}
                       </span>
                     </div>
-                    <span className="text-[10px] text-muted-foreground line-clamp-1 pl-4.5">
-                      {m.desc}
-                    </span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground whitespace-nowrap">
+                        {m.tag}
+                      </span>
+                      {isSelected ? (
+                        <Check className="size-3.5 text-primary shrink-0" />
+                      ) : (
+                        <span className="size-3.5 shrink-0" />
+                      )}
+                    </div>
                   </DropdownMenuItem>
                 )
               })}
