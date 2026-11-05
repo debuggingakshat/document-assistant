@@ -2,11 +2,12 @@
 
 A full-stack RAG assistant for querying SEC 10-K filings — hybrid retrieval (pgvector + full-text search), 4-gate hallucination grounding, and streaming PydanticAI reasoning.
 
-<p align="center">
+<p align="left">
   <a href="https://document-assistant-black.vercel.app"><img src="https://img.shields.io/badge/demo-live-000000?style=flat-square&logo=vercel&logoColor=white" alt="Live Demo" /></a>
+  <a href="#complete-from-scratch-redevelopment-guide"><img src="https://img.shields.io/badge/quickstart-setup%20guide-orange?style=flat-square" alt="Quickstart" /></a>
   <a href="#automated-verification--benchmark-suite"><img src="https://img.shields.io/badge/tests-71%2F71%20passing-brightgreen?style=flat-square&logo=pytest&logoColor=white" alt="Tests" /></a>
-  <a href="#core-system-architecture--innovations"><img src="https://img.shields.io/badge/stack-FastAPI%20%2B%20React%20%2B%20Supabase-informational?style=flat-square" alt="Tech Stack" /></a>
-  <a href="specifics.md"><img src="https://img.shields.io/badge/docs-specifics.md-blue?style=flat-square" alt="Architecture Docs" /></a>
+  <a href="#tech-stack"><img src="https://img.shields.io/badge/stack-FastAPI%20%2B%20React%20%2B%20Supabase-informational?style=flat-square" alt="Tech Stack" /></a>
+  <a href="specifics.md"><img src="https://img.shields.io/badge/docs-architectural%20blueprint-blue?style=flat-square" alt="Architectural Blueprint" /></a>
   <a href="#license"><img src="https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square" alt="License" /></a>
 </p>
 
@@ -345,6 +346,20 @@ Document Assistant is engineered to operate 100% within free-tier cloud quotas w
    - For high-concurrency production ASGI workers, use port `6543` (Transaction Pooler).
 4. **CORS Headers**:
    - If developing on a custom port, add the origin to `ALLOWED_ORIGINS` in `backend/.env`.
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+| :--- | :--- |
+| **Frontend** | React 19, TypeScript, Vite, Tailwind CSS v4, Radix UI (shadcn/ui) |
+| **Backend** | Python 3.13, FastAPI, PydanticAI, Uvicorn (ASGI) |
+| **Database** | Supabase Postgres, pgvector (768-d HNSW), pg_trgm full-text search |
+| **LLM & Embeddings** | Google Gemini (AI Studio Free Tier), gemini-embedding-001 |
+| **Auth** | Supabase Auth (JWT + Row-Level Security) |
+| **Migrations** | SQLAlchemy + Alembic |
+| **Hosting** | Vercel (frontend), Render (backend), Supabase (database) |
 
 ---
 
