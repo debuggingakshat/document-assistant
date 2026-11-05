@@ -8,7 +8,6 @@ A full-stack RAG assistant for querying SEC 10-K filings — hybrid retrieval (p
   <a href="#automated-verification--benchmark-suite"><img src="https://img.shields.io/badge/tests-71%2F71%20passing-brightgreen?style=flat-square&logo=pytest&logoColor=white" alt="Tests" /></a>
   <a href="#tech-stack"><img src="https://img.shields.io/badge/stack-FastAPI%20%2B%20React%20%2B%20Supabase-informational?style=flat-square" alt="Tech Stack" /></a>
   <a href="specifics.md"><img src="https://img.shields.io/badge/docs-architectural%20blueprint-blue?style=flat-square" alt="Architectural Blueprint" /></a>
-  <a href="#license"><img src="https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square" alt="License" /></a>
 </p>
 
 ---
