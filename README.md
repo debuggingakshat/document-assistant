@@ -7,15 +7,10 @@
 <p align="left">
   <a href="https://document-assistant-black.vercel.app"><img src="https://img.shields.io/badge/Production-Live%20Demo-000000?style=flat-square&logo=vercel&logoColor=white" alt="Live Demo" /></a>
   <a href="#automated-verification--benchmark-suite"><img src="https://img.shields.io/badge/Tests-71%2F71%20Passing-brightgreen?style=flat-square&logo=pytest&logoColor=white" alt="Automated Tests" /></a>
-  <a href="#stage-4-4-gate-fail-closed-grounding-validator"><img src="https://img.shields.io/badge/Grounding-4--Gate%20Fail--Closed-success?style=flat-square&logo=shield&logoColor=white" alt="Grounding Safety" /></a>
-  <a href="#license"><img src="https://img.shields.io/badge/License-MIT-yellow?style=flat-square" alt="License" /></a>
+  <a href="#license"><img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License" /></a>
 </p>
-<p align="left">
-  <a href="#core-system-architecture--innovations"><img src="https://img.shields.io/badge/Architecture-Modular%20RAG-orange?style=flat-square" alt="System Architecture" /></a>
-  <a href="#stage-1-concurrent-hybrid-retrieval"><img src="https://img.shields.io/badge/Retrieval-Hybrid%20RRF%20(k=60)-blue?style=flat-square" alt="Hybrid RRF Search" /></a>
-  <a href="#complete-from-scratch-redevelopment-guide"><img src="https://img.shields.io/badge/Quickstart-Local%20Setup-58a6ff?style=flat-square&logo=git&logoColor=white" alt="Quickstart Runbook" /></a>
-  <a href="specifics.md"><img src="https://img.shields.io/badge/Master%20Blueprint-specifics.md%20(27%20Deep--Dive%20Q%26As)-red?style=flat-square" alt="Master Architectural Blueprint" /></a>
-</p>
+
+**Quick Links:** [🚀 Live Demo](https://document-assistant-black.vercel.app) &nbsp;•&nbsp; [📊 Benchmark Comparison](#performance--industry-benchmark-comparison) &nbsp;•&nbsp; [🏛️ System Architecture](#core-system-architecture--innovations) &nbsp;•&nbsp; [⚡ Local Setup Runbook](#complete-from-scratch-redevelopment-guide) &nbsp;•&nbsp; [🧪 Verification Suite](#automated-verification--benchmark-suite) &nbsp;•&nbsp; [📖 Master Blueprint (`specifics.md`)](specifics.md)
 
 ---
 
