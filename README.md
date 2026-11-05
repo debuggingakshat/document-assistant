@@ -1,16 +1,14 @@
 # Meridian Research Document Assistant
 
-> **Institutional SEC 10-K Equity Research AI Assistant**  
-> Audited 10-K Filings for **Apple (`AAPL`)**, **Amazon (`AMZN`)**, **Alphabet (`GOOGL`)**, **Microsoft (`MSFT`)**, and **NVIDIA (`NVDA`)** (FY2021 – FY2025).  
-> **Production Deployment ($0.00 / Month)**: [document-assistant-black.vercel.app](https://document-assistant-black.vercel.app)
+A full-stack RAG assistant for querying SEC 10-K filings — hybrid retrieval (pgvector + full-text search), 4-gate hallucination grounding, and streaming PydanticAI reasoning.
 
-<p align="left">
-  <a href="https://document-assistant-black.vercel.app"><img src="https://img.shields.io/badge/Production-Live%20Demo-000000?style=flat-square&logo=vercel&logoColor=white" alt="Live Demo" /></a>
-  <a href="#automated-verification--benchmark-suite"><img src="https://img.shields.io/badge/Tests-71%2F71%20Passing-brightgreen?style=flat-square&logo=pytest&logoColor=white" alt="Automated Tests" /></a>
-  <a href="#license"><img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License" /></a>
+<p align="center">
+  <a href="https://document-assistant-black.vercel.app"><img src="https://img.shields.io/badge/demo-live-000000?style=flat-square&logo=vercel&logoColor=white" alt="Live Demo" /></a>
+  <a href="#automated-verification--benchmark-suite"><img src="https://img.shields.io/badge/tests-71%2F71%20passing-brightgreen?style=flat-square&logo=pytest&logoColor=white" alt="Tests" /></a>
+  <a href="#core-system-architecture--innovations"><img src="https://img.shields.io/badge/stack-FastAPI%20%2B%20React%20%2B%20Supabase-informational?style=flat-square" alt="Tech Stack" /></a>
+  <a href="specifics.md"><img src="https://img.shields.io/badge/docs-specifics.md-blue?style=flat-square" alt="Architecture Docs" /></a>
+  <a href="#license"><img src="https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square" alt="License" /></a>
 </p>
-
-**Quick Links:** [🚀 Live Demo](https://document-assistant-black.vercel.app) &nbsp;•&nbsp; [📊 Benchmark Comparison](#performance--industry-benchmark-comparison) &nbsp;•&nbsp; [🏛️ System Architecture](#core-system-architecture--innovations) &nbsp;•&nbsp; [⚡ Local Setup Runbook](#complete-from-scratch-redevelopment-guide) &nbsp;•&nbsp; [🧪 Verification Suite](#automated-verification--benchmark-suite) &nbsp;•&nbsp; [📖 Master Blueprint (`specifics.md`)](specifics.md)
 
 ---
 
