@@ -22,7 +22,8 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card"
-import { createShare, type Citation, type Message, type PipelineStatus } from "@/lib/api"
+import { ShareThreadModal } from "@/components/chat/ShareThreadModal"
+import { type Citation, type Message, type PipelineStatus } from "@/lib/api"
 import { formatFullDateTime, formatMessageTime } from "@/lib/dateUtils"
 import { cn } from "@/lib/utils"
 
@@ -61,29 +62,7 @@ export const MessageItem = memo(function MessageItem({
 }: MessageItemProps) {
   const isUser = message.role === "user"
   const [copied, setCopied] = useState(false)
-  const [shared, setShared] = useState(false)
-  const [sharing, setSharing] = useState(false)
   const [loadedPrompt, setLoadedPrompt] = useState<string | null>(null)
-
-  async function handleShareResponse() {
-    const targetThreadId = message.thread_id || threadId
-    if (!targetThreadId || sharing) return
-    setSharing(true)
-    try {
-      const res = await createShare(targetThreadId, {
-        share_type: "single_turn",
-        message_id: message.id,
-      })
-      const fullUrl = `${window.location.origin}${res.share_url}`
-      await navigator.clipboard.writeText(fullUrl)
-      setShared(true)
-      setTimeout(() => setShared(false), 2000)
-    } catch {
-      // Ignore clipboard/share errors
-    } finally {
-      setSharing(false)
-    }
-  }
 
   const modelBadge = useMemo(() => {
     const raw = message.ai_sdk_metadata?.model
@@ -1005,21 +984,24 @@ export const MessageItem = memo(function MessageItem({
               )}
             </button>
 
-            {/* Share Response Button (Icon only) */}
+            {/* Share Response Button (Modal Trigger) */}
             {!readOnly && (message.thread_id || threadId) && (
-              <button
-                type="button"
-                onClick={() => void handleShareResponse()}
-                disabled={isStreaming || sharing}
-                className="flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-muted/70 hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
-                title={shared ? "Link Copied!" : "Share response"}
-              >
-                {shared ? (
-                  <Check className="size-3.5 text-emerald-500" />
-                ) : (
-                  <Share className="size-3.5" />
-                )}
-              </button>
+              <ShareThreadModal
+                threadId={message.thread_id || threadId!}
+                messageId={message.id}
+                shareType="single_turn"
+                threadTitle={message.content.slice(0, 100)}
+                trigger={
+                  <button
+                    type="button"
+                    disabled={isStreaming}
+                    className="flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-muted/70 hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                    title="Share response"
+                  >
+                    <Share className="size-3.5" />
+                  </button>
+                }
+              />
             )}
 
             {/* Regenerate Button (Icon only) */}

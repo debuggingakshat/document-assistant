@@ -28,10 +28,10 @@ class SharedSnapshot(Base):
     )
     share_type: Mapped[str] = mapped_column(String(30))  # 'single_turn' or 'full_thread'
     title: Mapped[str] = mapped_column(String(500))
+    snapshot_payload: Mapped[dict] = mapped_column(JSONB)
     target_message_id: Mapped[uuid.UUID | None] = mapped_column(
         nullable=True, default=None
     )
-    snapshot_payload: Mapped[dict] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         init=False,

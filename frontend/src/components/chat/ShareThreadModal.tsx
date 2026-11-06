@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Check, Copy, Link as LinkIcon, Loader2, Share } from "lucide-react"
+import { Check, Copy, Link as LinkIcon, Loader2, RotateCw, Share } from "lucide-react"
 import { createShare } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import {
@@ -14,29 +14,47 @@ import {
 interface ShareThreadModalProps {
   threadId: string
   threadTitle?: string
+  shareType?: "single_turn" | "full_thread"
+  messageId?: string
+  trigger?: React.ReactNode
 }
 
-export function ShareThreadModal({ threadId, threadTitle }: ShareThreadModalProps) {
+export function ShareThreadModal({
+  threadId,
+  threadTitle,
+  shareType = "full_thread",
+  messageId,
+  trigger,
+}: ShareThreadModalProps) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [shareUrl, setShareUrl] = useState("")
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  async function handleOpenChange(newOpen: boolean) {
+  const isSingleTurn = shareType === "single_turn"
+
+  async function fetchShareUrl() {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await createShare(threadId, {
+        share_type: shareType,
+        message_id: messageId,
+      })
+      const fullUrl = `${window.location.origin}${res.share_url}`
+      setShareUrl(fullUrl)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to generate share link")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function handleOpenChange(newOpen: boolean) {
     setOpen(newOpen)
     if (newOpen && !shareUrl) {
-      setLoading(true)
-      setError(null)
-      try {
-        const res = await createShare(threadId, { share_type: "full_thread" })
-        const fullUrl = `${window.location.origin}${res.share_url}`
-        setShareUrl(fullUrl)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to generate share link")
-      } finally {
-        setLoading(false)
-      }
+      void fetchShareUrl()
     }
   }
 
@@ -54,25 +72,31 @@ export function ShareThreadModal({ threadId, threadTitle }: ShareThreadModalProp
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-7 gap-1.5 px-2.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
-          title="Share research thread"
-        >
-          <Share className="size-3.5" />
-          <span className="font-medium">Share</span>
-        </Button>
+        {trigger ? (
+          trigger
+        ) : (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 gap-1.5 px-2.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
+            title="Share research thread"
+          >
+            <Share className="size-3.5" />
+            <span className="font-medium">Share</span>
+          </Button>
+        )}
       </DialogTrigger>
 
       <DialogContent className="sm:max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl">
         <DialogHeader className="gap-1.5 text-left">
           <DialogTitle className="flex items-center gap-2 text-base font-semibold text-foreground">
             <Share className="size-4 text-primary" />
-            Share Research Thread
+            {isSingleTurn ? "Share Research Response" : "Share Research Thread"}
           </DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground leading-relaxed">
-            Anyone with this link can view this research conversation and audit citations without an account.
+            {isSingleTurn
+              ? "Anyone with this link can view this specific SEC research response and audit its verified sources."
+              : "Anyone with this link can view this research conversation and audit citations without an account."}
           </DialogDescription>
         </DialogHeader>
 
@@ -89,8 +113,18 @@ export function ShareThreadModal({ threadId, threadTitle }: ShareThreadModalProp
               <span>Generating immutable research snapshot...</span>
             </div>
           ) : error ? (
-            <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-3 text-xs text-destructive">
-              {error}
+            <div className="flex flex-col gap-2 rounded-xl border border-destructive/20 bg-destructive/10 p-3 text-xs text-destructive">
+              <div className="font-medium">{error}</div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void fetchShareUrl()}
+                className="w-fit h-7 text-xs gap-1.5 self-end border-destructive/30 text-destructive hover:bg-destructive/15 cursor-pointer"
+              >
+                <RotateCw className="size-3" />
+                <span>Try Again</span>
+              </Button>
             </div>
           ) : (
             <div className="flex items-center gap-2">
@@ -132,4 +166,3 @@ export function ShareThreadModal({ threadId, threadTitle }: ShareThreadModalProp
     </Dialog>
   )
 }
-
