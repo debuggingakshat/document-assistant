@@ -477,3 +477,146 @@ def test_list_threads_archived_filter():
             )
     finally:
         app.dependency_overrides.clear()
+
+
+# ---------------------------------------------------------------------------
+# Research Thread Sharing Tests
+# ---------------------------------------------------------------------------
+
+
+def test_share_thread_unauthenticated():
+    resp = client.post(f"/threads/{uuid.uuid4()}/share", json={"share_type": "full_thread"})
+    assert resp.status_code == 401
+
+
+def test_share_thread_full_thread():
+    thread_id = uuid.uuid4()
+    share_id = uuid.uuid4()
+    mock_thread = {"id": str(thread_id), "user_id": str(_USER_A_ID), "title": "NVDA FY24 Revenue"}
+    mock_messages = [
+        {"id": str(uuid.uuid4()), "role": "user", "content": "What was NVDA revenue?"},
+        {
+            "id": str(uuid.uuid4()),
+            "role": "assistant",
+            "content": "NVDA revenue was $60.9B.",
+            "citations": [{"chunk_id": str(uuid.uuid4()), "citation_index": 1}],
+        },
+    ]
+    mock_snapshot = {
+        "id": str(share_id),
+        "thread_id": str(thread_id),
+        "user_id": str(_USER_A_ID),
+        "share_type": "full_thread",
+        "title": "NVDA FY24 Revenue",
+        "snapshot_payload": {"title": "NVDA FY24 Revenue", "turns": []},
+        "created_at": _NOW,
+    }
+
+    app.dependency_overrides[get_current_user] = lambda: _USER_A
+    try:
+        with (
+            patch("app.api.chat.chats.get_thread", return_value=mock_thread),
+            patch("app.api.chat.chats.list_messages", return_value=mock_messages),
+            patch("app.api.chat.chats.create_snapshot", return_value=mock_snapshot) as mock_create,
+        ):
+            resp = client.post(f"/threads/{thread_id}/share", json={"share_type": "full_thread"})
+
+        assert resp.status_code == 201
+        data = resp.json()
+        assert data["share_id"] == str(share_id)
+        assert data["share_url"] == f"/share/{share_id}"
+        assert data["share_type"] == "full_thread"
+        mock_create.assert_called_once()
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_share_thread_single_turn():
+    thread_id = uuid.uuid4()
+    share_id = uuid.uuid4()
+    msg_id = uuid.uuid4()
+    mock_thread = {"id": str(thread_id), "user_id": str(_USER_A_ID), "title": "MSFT Cloud"}
+    mock_messages = [
+        {"id": str(uuid.uuid4()), "role": "user", "content": "Tell me about MSFT"},
+        {
+            "id": str(msg_id),
+            "role": "assistant",
+            "content": "MSFT cloud grew 29%.",
+            "citations": [],
+        },
+    ]
+    mock_snapshot = {
+        "id": str(share_id),
+        "thread_id": str(thread_id),
+        "user_id": str(_USER_A_ID),
+        "share_type": "single_turn",
+        "title": "Tell me about MSFT",
+        "snapshot_payload": {"title": "Tell me about MSFT", "turns": []},
+        "created_at": _NOW,
+    }
+
+    app.dependency_overrides[get_current_user] = lambda: _USER_A
+    try:
+        with (
+            patch("app.api.chat.chats.get_thread", return_value=mock_thread),
+            patch("app.api.chat.chats.list_messages", return_value=mock_messages),
+            patch("app.api.chat.chats.create_snapshot", return_value=mock_snapshot) as mock_create,
+        ):
+            resp = client.post(
+                f"/threads/{thread_id}/share",
+                json={"share_type": "single_turn", "message_id": str(msg_id)},
+            )
+
+        assert resp.status_code == 201
+        data = resp.json()
+        assert data["share_id"] == str(share_id)
+        assert data["share_type"] == "single_turn"
+        mock_create.assert_called_once()
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_share_thread_forbidden():
+    thread_id = uuid.uuid4()
+    mock_thread = {"id": str(thread_id), "user_id": str(_USER_A_ID), "title": "Secret Research"}
+
+    app.dependency_overrides[get_current_user] = lambda: _USER_B
+    try:
+        with patch("app.api.chat.chats.get_thread", return_value=mock_thread):
+            resp = client.post(f"/threads/{thread_id}/share", json={"share_type": "full_thread"})
+        assert resp.status_code == 403
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_get_shared_snapshot_public():
+    share_id = uuid.uuid4()
+    mock_snapshot = {
+        "id": str(share_id),
+        "thread_id": str(uuid.uuid4()),
+        "share_type": "full_thread",
+        "title": "Public Research",
+        "snapshot_payload": {
+            "title": "Public Research",
+            "share_type": "full_thread",
+            "turns": [],
+        },
+        "created_at": _NOW,
+    }
+
+    with patch("app.api.chat.chats.get_snapshot", return_value=mock_snapshot):
+        resp = client.get(f"/shared/{share_id}")
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["id"] == str(share_id)
+    assert data["title"] == "Public Research"
+
+
+def test_get_shared_snapshot_not_found():
+    share_id = uuid.uuid4()
+    with patch("app.api.chat.chats.get_snapshot", return_value=None):
+        resp = client.get(f"/shared/{share_id}")
+
+    assert resp.status_code == 404
+

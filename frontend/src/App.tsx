@@ -4,6 +4,7 @@ import { ChatLayout } from "@/components/chat/ChatLayout"
 import { AuthProvider } from "@/lib/auth"
 import { ChatPage } from "@/pages/ChatPage"
 import { LoginPage } from "@/pages/LoginPage"
+import { SharedThreadPage } from "@/pages/SharedThreadPage"
 import { SignUpPage } from "@/pages/SignUpPage"
 
 export default function App() {
@@ -13,6 +14,7 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignUpPage />} />
+          <Route path="/share/:shareId" element={<SharedThreadPage />} />
 
           {/* Protected routes */}
           <Route element={<ProtectedRoute />}>

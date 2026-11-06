@@ -61,6 +61,37 @@ export interface PipelineStatus {
   technical_details?: Record<string, any>
 }
 
+export interface CreateSharePayload {
+  share_type: "single_turn" | "full_thread"
+  message_id?: string
+}
+
+export interface CreateShareResponse {
+  share_id: string
+  share_url: string
+  share_type: string
+  title: string
+}
+
+export interface SharedTurn {
+  user_message: Message | null
+  assistant_message: Message
+}
+
+export interface SharedSnapshotResponse {
+  id: string
+  thread_id: string
+  share_type: "single_turn" | "full_thread"
+  title: string
+  created_at: string
+  snapshot_payload: {
+    title: string
+    share_type: string
+    created_at: string
+    turns: SharedTurn[]
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Thread endpoints
 // ---------------------------------------------------------------------------
@@ -98,6 +129,19 @@ export function deleteThread(threadId: string): Promise<void> {
 /** Fetch stored citations for an assistant message. */
 export function listMessageCitations(messageId: string): Promise<Citation[]> {
   return http.get<Citation[]>(`/messages/${messageId}/citations`)
+}
+
+/** Create an immutable public snapshot for a single turn or an entire thread. */
+export function createShare(
+  threadId: string,
+  payload: CreateSharePayload
+): Promise<CreateShareResponse> {
+  return http.post<CreateShareResponse>(`/threads/${threadId}/share`, payload)
+}
+
+/** Fetch an immutable shared research snapshot (public). */
+export function getSharedSnapshot(shareId: string): Promise<SharedSnapshotResponse> {
+  return http.get<SharedSnapshotResponse>(`/shared/${shareId}`)
 }
 
 // ---------------------------------------------------------------------------

@@ -25,6 +25,7 @@ import { MessageInput } from "@/components/chat/MessageInput"
 import { MessageItem } from "@/components/chat/MessageItem"
 import { PipelineStatusIndicator } from "@/components/chat/PipelineStatusIndicator"
 import { SourcePassageSheet } from "@/components/chat/SourcePassageSheet"
+import { ShareThreadModal } from "@/components/chat/ShareThreadModal"
 import { ThemeToggle } from "@/components/chat/ThemeToggle"
 import { type Citation, type Message } from "@/lib/api"
 import { formatMessageDate, isDifferentDay } from "@/lib/dateUtils"
@@ -463,6 +464,10 @@ export function ChatArea({ threadId }: ChatAreaProps) {
 
         {/* Right Header Controls */}
         <div className="flex items-center gap-2">
+          {threadId && messages.length > 0 && (
+            <ShareThreadModal threadId={threadId} />
+          )}
+
           <Badge variant="outline" className="hidden sm:inline-flex text-[11px] font-mono">
             Coverage: 5 Companies (FY21–25)
           </Badge>
@@ -635,6 +640,7 @@ export function ChatArea({ threadId }: ChatAreaProps) {
                             : null
                         }
                         onSelectCitation={(cit) => setSelectedCitation(cit)}
+                        threadId={threadId}
                       />
                     )}
                   </div>

@@ -1,7 +1,7 @@
 """Chat API router for thread management and AI streaming."""
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -49,6 +49,37 @@ class MessageResponse(BaseModel):
     created_at: datetime
     ai_sdk_metadata: dict[str, Any] | None = None
     citations: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class CreateShareRequest(BaseModel):
+    share_type: str = Field(
+        default="full_thread",
+        description="'single_turn' or 'full_thread'",
+        validation_alias=AliasChoices("shareType", "share_type"),
+    )
+    message_id: uuid.UUID | None = Field(
+        default=None,
+        description="Target assistant message ID when share_type is 'single_turn'",
+        validation_alias=AliasChoices("messageId", "message_id"),
+    )
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class CreateShareResponse(BaseModel):
+    share_id: uuid.UUID
+    share_url: str
+    share_type: str
+    title: str
+
+
+class SharedSnapshotResponse(BaseModel):
+    id: uuid.UUID
+    thread_id: uuid.UUID
+    share_type: str
+    title: str
+    snapshot_payload: dict[str, Any]
+    created_at: datetime
 
 
 class ChatStreamRequest(BaseModel):
@@ -270,3 +301,132 @@ async def chat_stream(
         media_type="text/plain; charset=utf-8",
         headers={"x-vercel-ai-data-stream": "v1"},
     )
+
+
+@router.post(
+    "/threads/{thread_id}/share",
+    response_model=CreateShareResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def share_thread(
+    thread_id: uuid.UUID,
+    body: CreateShareRequest,
+    user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+) -> dict[str, Any]:
+    """Create an immutable public snapshot for a single turn or an entire research thread."""
+    client = get_service_role_client()
+    thread = chats.get_thread(client=client, thread_id=thread_id)
+    if thread is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Thread not found",
+        )
+
+    if str(thread.get("user_id")) != str(user.id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to share this thread",
+        )
+
+    all_messages = chats.list_messages(client=client, thread_id=thread_id, include_citations=True)
+    if not all_messages:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot share an empty thread with no messages",
+        )
+
+    turns: list[dict[str, Any]] = []
+    title = thread.get("title") or "SEC Research Analysis"
+
+    if body.share_type == "single_turn":
+        # Find the specific assistant message and its matching user prompt
+        target_msg = None
+        target_idx = -1
+        for idx, m in enumerate(all_messages):
+            if body.message_id and str(m.get("id")) == str(body.message_id):
+                target_msg = m
+                target_idx = idx
+                break
+
+        # Fallback to last assistant message if not found by id
+        if target_msg is None:
+            for idx in range(len(all_messages) - 1, -1, -1):
+                if all_messages[idx].get("role") == "assistant":
+                    target_msg = all_messages[idx]
+                    target_idx = idx
+                    break
+
+        if target_msg is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No assistant response found to share",
+            )
+
+        # Locate the user message preceding this assistant message
+        user_msg = None
+        for idx in range(target_idx - 1, -1, -1):
+            if all_messages[idx].get("role") == "user":
+                user_msg = all_messages[idx]
+                break
+
+        turns.append({
+            "user_message": user_msg,
+            "assistant_message": target_msg,
+        })
+        if user_msg and user_msg.get("content"):
+            title = user_msg["content"].strip().split("\n")[0][:100]
+    else:
+        # Full thread share: group chronological turns
+        curr_user = None
+        for m in all_messages:
+            if m.get("role") == "user":
+                curr_user = m
+            elif m.get("role") == "assistant":
+                turns.append({
+                    "user_message": curr_user,
+                    "assistant_message": m,
+                })
+
+    payload = {
+        "title": title,
+        "share_type": body.share_type,
+        "created_at": datetime.now(UTC).isoformat(),
+        "turns": turns,
+    }
+
+    snapshot = chats.create_snapshot(
+        client=client,
+        thread_id=thread_id,
+        user_id=user.id,
+        share_type=body.share_type,
+        title=title,
+        snapshot_payload=payload,
+        target_message_id=body.message_id if body.share_type == "single_turn" else None,
+    )
+
+    return {
+        "share_id": snapshot["id"],
+        "share_url": f"/share/{snapshot['id']}",
+        "share_type": body.share_type,
+        "title": title,
+    }
+
+
+@router.get(
+    "/shared/{share_id}",
+    response_model=SharedSnapshotResponse,
+)
+async def get_shared_snapshot(
+    share_id: uuid.UUID,
+) -> dict[str, Any]:
+    """Public endpoint to fetch an immutable shared research snapshot (no authentication required)."""
+    client = get_service_role_client()
+    snapshot = chats.get_snapshot(client=client, share_id=share_id)
+    if snapshot is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Shared research thread not found or link has expired",
+        )
+
+    return snapshot
+

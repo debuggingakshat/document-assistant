@@ -197,3 +197,44 @@ def list_citations(client: Client, message_id: uuid.UUID) -> list[dict[str, Any]
         .execute()
     )
     return response.data if response else None or []
+
+
+def create_snapshot(
+    client: Client,
+    thread_id: uuid.UUID,
+    user_id: uuid.UUID,
+    share_type: str,
+    title: str,
+    snapshot_payload: dict[str, Any],
+    target_message_id: uuid.UUID | None = None,
+) -> dict[str, Any]:
+    """Insert an immutable public snapshot for a research thread or turn."""
+    payload: dict[str, Any] = {
+        "thread_id": str(thread_id),
+        "user_id": str(user_id),
+        "share_type": share_type,
+        "title": title,
+        "snapshot_payload": snapshot_payload,
+    }
+    if target_message_id is not None:
+        payload["target_message_id"] = str(target_message_id)
+
+    response = client.table("shared_snapshots").insert(payload).execute()
+    data = response.data
+    if not data or len(data) == 0:
+        msg = "Failed to create shared snapshot"
+        raise RuntimeError(msg)
+    return data[0]
+
+
+def get_snapshot(client: Client, share_id: uuid.UUID) -> dict[str, Any] | None:
+    """Fetch an immutable shared snapshot by primary key ID."""
+    response = (
+        client.table("shared_snapshots")
+        .select("*")
+        .eq("id", str(share_id))
+        .maybe_single()
+        .execute()
+    )
+    return response.data if response else None
+
