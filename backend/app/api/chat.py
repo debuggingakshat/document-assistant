@@ -283,7 +283,8 @@ async def chat_stream(
             parsed_parent_id = uuid.UUID(str(body.parent_user_message_id))
         except (ValueError, TypeError):
             db_user_msgs = [
-                m for m in chats.list_messages(client, body.thread_id)
+                m
+                for m in chats.list_messages(client, body.thread_id)
                 if m.get("role") == "user"
             ]
             if db_user_msgs:
@@ -328,7 +329,9 @@ async def share_thread(
             detail="You do not have permission to share this thread",
         )
 
-    all_messages = chats.list_messages(client=client, thread_id=thread_id, include_citations=True)
+    all_messages = chats.list_messages(
+        client=client, thread_id=thread_id, include_citations=True
+    )
     if not all_messages:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -369,10 +372,12 @@ async def share_thread(
                 user_msg = all_messages[idx]
                 break
 
-        turns.append({
-            "user_message": user_msg,
-            "assistant_message": target_msg,
-        })
+        turns.append(
+            {
+                "user_message": user_msg,
+                "assistant_message": target_msg,
+            }
+        )
         if user_msg and user_msg.get("content"):
             title = user_msg["content"].strip().split("\n")[0][:100]
     else:
@@ -382,10 +387,12 @@ async def share_thread(
             if m.get("role") == "user":
                 curr_user = m
             elif m.get("role") == "assistant":
-                turns.append({
-                    "user_message": curr_user,
-                    "assistant_message": m,
-                })
+                turns.append(
+                    {
+                        "user_message": curr_user,
+                        "assistant_message": m,
+                    }
+                )
 
     payload = {
         "title": title,
@@ -429,4 +436,3 @@ async def get_shared_snapshot(
         )
 
     return snapshot
-
