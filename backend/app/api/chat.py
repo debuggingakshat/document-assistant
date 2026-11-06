@@ -280,7 +280,7 @@ async def chat_stream(
     parsed_parent_id: uuid.UUID | None = None
     if body.parent_user_message_id:
         try:
-            parsed_parent_id = uuid.UUID(str(body.parent_user_message_id))
+            parsed_parent_id = uuid.UUID(body.parent_user_message_id)
         except (ValueError, TypeError):
             db_user_msgs = [
                 m
