@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { Link, useParams } from "react-router-dom"
-import { ArrowUpRight, FileCheck, Layers, Loader2, Share2, Sparkles } from "lucide-react"
+import { ArrowUpRight, Layers, Loader2, Share2, Sparkles } from "lucide-react"
 import { getSharedSnapshot, type Citation, type SharedSnapshotResponse } from "@/lib/api"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -100,22 +100,6 @@ export function SharedThreadPage() {
           </div>
         ) : (
           <div className="flex flex-col gap-6">
-            {/* Thread Header Banner */}
-            <div className="rounded-2xl border border-border/80 bg-card/60 p-5 shadow-2xs backdrop-blur-xs">
-              <div className="flex items-center gap-2 text-[11px] font-mono text-muted-foreground mb-1.5">
-                <FileCheck className="size-3.5 text-emerald-500 shrink-0" />
-                <span>Audited SEC 10-K Research Snapshot</span>
-                <span>•</span>
-                <span>{new Date(snapshot.created_at).toLocaleDateString(undefined, { dateStyle: "medium" })}</span>
-              </div>
-              <h1 className="text-lg sm:text-xl font-bold tracking-tight text-foreground">
-                {snapshot.title}
-              </h1>
-              <p className="mt-1 text-xs text-muted-foreground">
-                All numerical figures, segment metrics, and table footnotes below are verified against official SEC 10-K filings.
-              </p>
-            </div>
-
             {/* Rendered Turns */}
             <div className="space-y-6">
               {turns.map((turn, idx) => (
