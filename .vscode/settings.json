@@ -1,7 +1,14 @@
 {
-  "python.defaultInterpreterPath": "${workspaceFolder}/backend/.venv/bin/python",
-  "python.analysis.extraPaths": ["${workspaceFolder}/backend"],
+  "python-envs.workspaceSearchPaths": [
+    "./backend/.venv"
+  ],
+  "python.venvFolders": [
+    ".venv",
+    "backend/.venv"
+  ],
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}/backend"
+  ],
   "python.locator": "js",
   "css.lint.unknownAtRules": "ignore"
 }
-
