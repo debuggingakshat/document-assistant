@@ -731,6 +731,73 @@ $$\text{Cosine Distance} = 1 - \cos(\theta)$$
 - If the two vectors are perpendicular ($\theta = 90^\circ$), $\cos(90^\circ) = 0$, and $\text{Cosine Distance} = 1 - 0 = \mathbf{1.0}$ (Completely unrelated).
 - By dividing by the vector lengths $\|u\|$ and $\|v\|$, **length is completely eliminated from the calculation**. A 5-word query and a 500-word paragraph pointing in the same semantic direction receive a near-zero cosine distance.
 
+#### The Great Debate: Why is There Even a Debate on Cosine vs. Euclidean?
+
+For text embeddings, what we intuitively care about is the *direction* (the semantic meaning), not how long or verbose the document is. So why is there a debate at all? And why do top engineers and database architects still talk about Euclidean distance?
+
+The answer comes down to **a mathematical secret**, **raw hardware speed**, and **domains outside of text**.
+
+##### 1. The Mathematical Secret: They Are Actually the Same Thing!
+
+In modern vector search (including Document Assistant), **all embeddings are normalized to unit length** before being saved:
+$$\|u\| = 1.0 \quad \text{and} \quad \|v\| = 1.0$$
+
+When two vectors are normalized to length 1, look at the math for Euclidean distance squared ($\|u - v\|^2$):
+
+$$\|u - v\|^2 = \|u\|^2 + \|v\|^2 - 2(u \cdot v)$$
+$$\|u - v\|^2 = 1 + 1 - 2\cos(\theta)$$
+$$\|u - v\|^2 = 2 \cdot (1 - \cos(\theta)) = 2 \cdot \text{Cosine Distance}$$
+
+$$\text{Euclidean Distance} = \sqrt{2 \cdot \text{Cosine Distance}}$$
+
+###### What Does This Mean?
+If your vectors are unit-normalized, **Euclidean distance and Cosine distance produce the exact same ranking!** 
+* The vector with the smallest cosine distance will *always* have the smallest Euclidean distance. 
+* Rank #1 by Cosine is **guaranteed** to be Rank #1 by Euclidean.
+
+##### 2. So Why Do Engineers Still Prefer Euclidean / Dot Product? (Hardware Speed)
+
+If the ranking is identical, why would anyone pick Euclidean over Cosine? 
+
+**Because hardware (CPUs & GPUs) hates calculating Cosine distance:**
+* To calculate Cosine distance:
+  $$\text{Cosine} = 1 - \frac{u \cdot v}{\|u\| \|v\|}$$
+  The computer has to compute square roots ($\sqrt{\dots}$) and floating-point divisions ($/$) on every single vector comparison. These operations are computationally expensive.
+* To calculate Euclidean distance (or Dot Product):
+  $$\sum (u_i - v_i)^2$$
+  Modern CPU and GPU chips (AVX-512, Apple Silicon NEON, NVIDIA CUDA) have dedicated hardware instructions called **FMA (Fused Multiply-Add)**. They can calculate Euclidean distances and dot products **2x to 5x faster** than cosine distance.
+
+> **Engineering Trick:** 
+> Senior engineers **normalize the vectors once** when inserting them into the database, and then use **Euclidean distance (`<->`) or Negative Inner Product (`<#>`)** at search time. You get the semantic benefits of Cosine meaning, but with the raw speed of Euclidean hardware instructions!
+
+##### 3. Where is Euclidean Distance ACTUALLY Required over Cosine?
+
+There are cases where **magnitude (length) carries vital information**, and using Cosine distance would destroy that information:
+
+###### A. Recommendation Systems (User Passion / Frequency)
+* Imagine Spotify or Netflix vector embeddings.
+* An analyst creates a vector for User A who watched **500 sci-fi movies**, and User B who watched **1 sci-fi movie**.
+* Both users point in the exact same *direction* (sci-fi).
+  * **Cosine distance** says: *"These users are 100% identical!"* (ignores magnitude).
+  * **Euclidean distance** says: *"User A is much further out than User B; User A has intense preference/confidence, while User B is casual."*
+
+###### B. Clustering Algorithms (k-means and Voronoi Cells in IVFFlat)
+* Many database indexing algorithms (like `IVFFlat`) partition vector space into geometric clusters called Voronoi cells using standard k-means.
+* Standard k-means calculates cluster centers by taking the arithmetic average (Euclidean centroid). If you try doing that on a curved sphere (cosine space), the centroids drift inside the sphere unless you run complex spherical math.
+
+###### C. Scientific & Physical Data (Sensors, Colors, Finance)
+* In computer vision (RGB color distance), audio signal processing (sound amplitude/volume), or financial volatility modeling, the length of the vector represents **real physical units** (e.g. brightness, decibels, dollar volume). 
+* Ignoring length in those fields would give completely wrong results.
+
+##### 4. Summary for an Interview:
+If an interviewer asks: *"Why did you use cosine distance `<=>` instead of Euclidean `<->` in `pgvector`?"*
+
+> *"For text and SEC 10-K filings, semantic meaning is captured by angular orientation rather than document length, making cosine distance the natural conceptual choice.*
+>
+> *Under the hood, because our embedding pipeline pre-normalizes all vectors to unit length ($\|u\|_2 = 1.0$), Euclidean distance and Cosine distance are mathematically isomorphic—they yield the exact same ordinal ranking ($\|u - v\|_2 = \sqrt{2 \cdot \text{Cosine Distance}}$).*
+>
+> *We use `<=>` in SQL for clean readability in the $[0, 2]$ range, but in high-throughput systems, pre-normalizing vectors and querying via Euclidean or Negative Inner Product (`<#>`) is computationally superior because modern hardware can execute dot products via vectorized Fused Multiply-Add (FMA) instructions without square root or division overhead."*
+
 ---
 
 ### 4.3 Deep Dive: What is HNSW (Hierarchical Navigable Small World)?
@@ -2052,6 +2119,9 @@ Naïve Chunking (Header Loss)           Our Structure-Aware Chunking (Header Inj
    - Under unit normalization, Euclidean distance squared simplifies to:
      $$\|u - v\|^2 = \|u\|^2 + \|v\|^2 - 2(u \cdot v) = 2 - 2(u \cdot v) = 2 \cdot \text{Cosine Distance}$$
    - Similarly, cosine distance equals $1 + \text{Negative Inner Product}$.
+   - **The Hardware Speed Advantage (Why Engineers Prefer Euclidean / Dot Product in Production)**:
+     - While Cosine Distance conceptually isolates semantic orientation from text length, modern CPU/GPU architectures (AVX-512, Apple Silicon NEON, CUDA) execute dot products and Euclidean distances 2x to 5x faster via hardware Fused Multiply-Add (FMA) instructions, avoiding the costly square-root and floating-point division penalties inherent to runtime cosine normalization.
+     - In high-throughput production systems, senior engineers pre-normalize embeddings once at ingestion, then query using Negative Inner Product (`<#>`) or Euclidean (`<->`) to achieve identical ordinal ranking at peak hardware throughput.
    - We explicitly utilize `<=>` in our SQL queries to maintain intuitive cosine distance boundaries in $[0, 2]$, where similarity is computed as:
      $$\text{Similarity} = \max(0.0, 1.0 - \text{distance})$$
 
