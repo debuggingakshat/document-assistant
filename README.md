@@ -1,3 +1,11 @@
+<p align="left">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="frontend/public/meridian-logo-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="frontend/public/meridian-logo-light.png">
+    <img alt="Meridian Research" src="frontend/public/meridian-logo-dark.png" height="46">
+  </picture>
+</p>
+
 # Meridian Research Document Assistant
 
 A full-stack RAG assistant for querying SEC 10-K filings — hybrid retrieval (pgvector + full-text search), 4-gate hallucination grounding, and streaming PydanticAI reasoning.
@@ -5,7 +13,7 @@ A full-stack RAG assistant for querying SEC 10-K filings — hybrid retrieval (p
 <p align="left">
   <a href="https://document-assistant-black.vercel.app"><img src="https://img.shields.io/badge/demo-live-000000?style=flat-square&logo=vercel&logoColor=white" alt="Live Demo" /></a>
   <a href="#complete-from-scratch-redevelopment-guide"><img src="https://img.shields.io/badge/quickstart-setup%20guide-orange?style=flat-square" alt="Quickstart" /></a>
-  <a href="#automated-verification--benchmark-suite"><img src="https://img.shields.io/badge/tests-71%2F71%20passing-brightgreen?style=flat-square&logo=pytest&logoColor=white" alt="Tests" /></a>
+  <a href="#automated-verification--benchmark-suite"><img src="https://img.shields.io/badge/tests-77%2F77%20passing-brightgreen?style=flat-square&logo=pytest&logoColor=white" alt="Tests" /></a>
   <a href="#tech-stack"><img src="https://img.shields.io/badge/stack-FastAPI%20%2B%20React%20%2B%20Supabase-informational?style=flat-square" alt="Tech Stack" /></a>
   <a href="specifics.md"><img src="https://img.shields.io/badge/docs-architectural%20blueprint-blue?style=flat-square" alt="Architectural Blueprint" /></a>
 </p>
@@ -31,7 +39,7 @@ A full-stack RAG assistant for querying SEC 10-K filings — hybrid retrieval (p
 > - **Corpus Scale**: 2,793 chunks indexed across 25 audited SEC 10-K filings (FY2021–FY2025 for AAPL, AMZN, GOOGL, MSFT, and NVDA) with an 8.58 MB `pgvector` RAM footprint.
 > - **Zero-Cost High-Availability**: 2,160+ queries/day operated entirely at **$0.00/month** through a 2D waterfall key/model rotation cascade (2 Gemini API keys $\times$ 6 fallback models).
 > - **Deterministic Grounding**: 100% citation pass rate via a programmatic 4-Gate fail-closed pipeline (UUID provenance, ticker boundary isolation, and verbatim numerical cell verification).
-> - **Automated Test Coverage**: 71/71 passing automated tests across retrieval, parsing, grounding, and streaming APIs.
+> - **Automated Test Coverage**: 77/77 passing automated tests across retrieval, parsing, grounding, and streaming APIs.
 
 ---
 
