@@ -330,26 +330,32 @@ export const MessageItem = memo(function MessageItem({
 
   // Render inline formatting (citations, bold, italics, code, math, superscripts)
   function renderInlineSpans(inlineText: string): React.ReactNode {
+    const ESC_AST = "\uE000"
+    const ESC_UND = "\uE001"
+    const sanitized = inlineText.replace(/\\\*/g, ESC_AST).replace(/\\_/g, ESC_UND)
+
     const inlineRegex = /(\[\^\d+\]|\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|\\\(.+?\\\)|\$(?!\d|\s)[^$\n]*?(?<!\s)\$)/g
-    const parts = inlineText.split(inlineRegex)
+    const parts = sanitized.split(inlineRegex)
+
+    const unescape = (str: string) => str.replaceAll(ESC_AST, "*").replaceAll(ESC_UND, "_")
 
     return parts.map((part, i) => {
       if (!part) return null
 
       // Inline LaTeX Math \( ... \)
       if (part.startsWith("\\(") && part.endsWith("\\)") && part.length >= 4) {
-        return <span key={i}>{renderMath(part.slice(2, -2), false)}</span>
+        return <span key={i}>{renderMath(unescape(part.slice(2, -2)), false)}</span>
       }
 
       // Inline Math $ ... $
       if (part.startsWith("$") && part.endsWith("$") && part.length >= 3) {
         const inner = part.slice(1, -1)
         if (isLikelyMath(inner)) {
-          return <span key={i}>{renderMath(inner, false)}</span>
+          return <span key={i}>{renderMath(unescape(inner), false)}</span>
         }
         return (
           <span key={i}>
-            ${renderInlineSpans(inner)}$
+            ${renderInlineSpans(unescape(inner))}$
           </span>
         )
       }
@@ -428,7 +434,7 @@ export const MessageItem = memo(function MessageItem({
       if (part.startsWith("**") && part.endsWith("**") && part.length >= 4) {
         return (
           <strong key={i} className="font-semibold text-foreground">
-            {part.slice(2, -2)}
+            {unescape(part.slice(2, -2))}
           </strong>
         )
       }
@@ -437,7 +443,7 @@ export const MessageItem = memo(function MessageItem({
       if (part.startsWith("*") && part.endsWith("*") && part.length >= 2) {
         return (
           <em key={i} className="italic text-foreground/90">
-            {part.slice(1, -1)}
+            {unescape(part.slice(1, -1))}
           </em>
         )
       }
@@ -449,12 +455,12 @@ export const MessageItem = memo(function MessageItem({
             key={i}
             className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-foreground border border-border/60"
           >
-            {part.slice(1, -1)}
+            {unescape(part.slice(1, -1))}
           </code>
         )
       }
 
-      return <span key={i}>{part}</span>
+      return <span key={i}>{unescape(part)}</span>
     })
   }
 
@@ -645,7 +651,7 @@ export const MessageItem = memo(function MessageItem({
       flushList()
 
       // Table footnotes e.g. *¹ Previously reported as ... or *² Total revenues...
-      if (/^\*?[¹²³\*]/.test(trimmed)) {
+      if (/^(?:\\\*|\*?[¹²³*])/.test(trimmed)) {
         elements.push(
           <p
             key={`fn-${lIdx}`}
