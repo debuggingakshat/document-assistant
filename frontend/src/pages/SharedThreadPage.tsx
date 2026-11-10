@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { Link, useParams } from "react-router-dom"
-import { ArrowUpRight, Layers, Loader2, Share2, Sparkles } from "lucide-react"
+import { ArrowUpRight, Layers, Loader2, Share2 } from "lucide-react"
 import { getSharedSnapshot, type Citation, type SharedSnapshotResponse } from "@/lib/api"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -116,17 +116,6 @@ export function SharedThreadPage() {
                   )}
                 </div>
               ))}
-            </div>
-
-            {/* Footnote Compliance Banner */}
-            <div className="mt-8 rounded-xl border border-border/60 bg-muted/30 p-4 text-center text-xs text-muted-foreground">
-              <div className="flex items-center justify-center gap-1.5 font-medium text-foreground mb-1">
-                <Sparkles className="size-3.5 text-primary" />
-                <span>Deterministic Grounding Guarantee</span>
-              </div>
-              <p className="text-[11px] leading-relaxed max-w-lg mx-auto">
-                All citations are verified via a 4-gate fail-closed pipeline. Click any citation chip (<span className="font-mono text-primary font-semibold">[^1]</span>) above to inspect raw SEC filing passages and verified cell numbers.
-              </p>
             </div>
           </div>
         )}
