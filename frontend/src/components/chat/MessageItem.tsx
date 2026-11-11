@@ -9,12 +9,14 @@ import {
   CornerDownRight,
   ExternalLink,
   FileSpreadsheet,
+  Pencil,
   RotateCw,
   Share,
   ShieldCheck,
   User,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { FinancialTable } from "@/components/chat/FinancialTable"
 import { highlightFinancialFigures } from "@/components/chat/SourcePassageSheet"
 import {
@@ -37,6 +39,7 @@ interface MessageItemProps {
   onSelectVersion?: (index: number) => void
   onRegenerate?: () => void
   onRetryPrompt?: () => void
+  onEditPrompt?: (messageId: string, newContent: string) => void
   hasResponse?: boolean
   pipelineStatus?: PipelineStatus | null
   onSelectCitation?: (citation: Citation) => void
@@ -54,6 +57,7 @@ export const MessageItem = memo(function MessageItem({
   onSelectVersion,
   onRegenerate,
   onRetryPrompt,
+  onEditPrompt,
   hasResponse: _hasResponse = true,
   pipelineStatus,
   onSelectCitation,
@@ -63,6 +67,32 @@ export const MessageItem = memo(function MessageItem({
   const isUser = message.role === "user"
   const [copied, setCopied] = useState(false)
   const [loadedPrompt, setLoadedPrompt] = useState<string | null>(null)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editText, setEditText] = useState(message.content)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    if (isEditing && textareaRef.current) {
+      textareaRef.current.focus()
+      textareaRef.current.style.height = "auto"
+      textareaRef.current.style.height = `${Math.min(300, textareaRef.current.scrollHeight)}px`
+    }
+  }, [isEditing])
+
+  const handleCancelEdit = () => {
+    setIsEditing(false)
+    setEditText(message.content)
+  }
+
+  const handleSaveEdit = () => {
+    const trimmed = editText.trim()
+    if (!trimmed || trimmed === message.content.trim() || isStreaming) {
+      setIsEditing(false)
+      return
+    }
+    setIsEditing(false)
+    onEditPrompt?.(message.id, trimmed)
+  }
 
   const modelBadge = useMemo(() => {
     const raw = message.ai_sdk_metadata?.model
@@ -879,7 +909,57 @@ export const MessageItem = memo(function MessageItem({
           ) : (
             <div className={cn("break-words font-normal", isUser ? "whitespace-pre-wrap text-foreground" : "space-y-1 text-[13.5px]")}>
               {isUser ? (
-                message.content
+                isEditing ? (
+                  <div className="flex flex-col gap-2 w-full min-w-[280px] sm:min-w-[420px]">
+                    <textarea
+                      ref={textareaRef}
+                      value={editText}
+                      onChange={(e) => {
+                        setEditText(e.target.value)
+                        e.target.style.height = "auto"
+                        e.target.style.height = `${Math.min(300, e.target.scrollHeight)}px`
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault()
+                          handleSaveEdit()
+                        } else if (e.key === "Escape") {
+                          handleCancelEdit()
+                        }
+                      }}
+                      rows={Math.min(8, Math.max(2, editText.split("\n").length))}
+                      className="w-full resize-none rounded-xl border border-primary/40 bg-background/90 p-2.5 text-[13.5px] leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 font-sans shadow-inner"
+                      placeholder="Edit your question..."
+                    />
+                    <div className="flex items-center justify-between gap-2 pt-0.5">
+                      <span className="text-[10.5px] text-muted-foreground/80 font-mono">
+                        Enter to save · Esc to cancel
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleCancelEdit}
+                          className="h-7 px-2.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={handleSaveEdit}
+                          disabled={!editText.trim() || editText.trim() === message.content.trim() || isStreaming}
+                          className="h-7 gap-1 px-3 text-xs font-medium cursor-pointer shadow-xs"
+                        >
+                          <span>Save & Submit</span>
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  message.content
+                )
               ) : !message.content ? (
                 <div className="flex flex-col gap-2 rounded-lg border border-border/70 bg-muted/30 p-3 text-xs text-muted-foreground my-1 select-none">
                   <div className="flex items-center gap-1.5 font-medium text-foreground">
@@ -1084,7 +1164,7 @@ export const MessageItem = memo(function MessageItem({
           )}
 
         {/* User Message Actions & Footer Timestamp (Below the user prompt bubble) */}
-        {isUser && message.content && (
+        {isUser && message.content && !isEditing && (
           <div
             className={cn(
               "mt-1.5 flex items-center gap-1 text-[11px] text-muted-foreground select-none px-1 transition-opacity",
@@ -1104,6 +1184,22 @@ export const MessageItem = memo(function MessageItem({
                 <Copy className="size-3.5" />
               )}
             </button>
+
+            {/* Edit Button (Icon only) */}
+            {!readOnly && onEditPrompt && (
+              <button
+                type="button"
+                onClick={() => {
+                  setEditText(message.content)
+                  setIsEditing(true)
+                }}
+                disabled={isStreaming}
+                className="flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-muted/70 hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                title="Edit prompt & change conversation course"
+              >
+                <Pencil className="size-3.5" />
+              </button>
+            )}
 
             {/* Regenerate / Resend Button (Icon only) */}
             {onRetryPrompt && (

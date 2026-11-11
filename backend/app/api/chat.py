@@ -92,6 +92,10 @@ class ChatStreamRequest(BaseModel):
         default=None,
         validation_alias=AliasChoices("parentUserMessageId", "parent_user_message_id"),
     )
+    edit_message_id: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("editMessageId", "edit_message_id"),
+    )
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -278,7 +282,43 @@ async def chat_stream(
         )
 
     parsed_parent_id: uuid.UUID | None = None
-    if body.parent_user_message_id:
+    if body.edit_message_id:
+        try:
+            target_edit_id = uuid.UUID(body.edit_message_id)
+        except (ValueError, TypeError):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid editMessageId UUID format",
+            )
+
+        all_msgs = chats.list_messages(client, body.thread_id, include_citations=False)
+        target_idx: int | None = None
+        for i, m in enumerate(all_msgs):
+            if str(m.get("id")) == str(target_edit_id):
+                target_idx = i
+                break
+
+        if target_idx is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Target message to edit not found in this thread",
+            )
+
+        # If editing the very first prompt in thread, reset title so auto-titling regenerates
+        if target_idx == 0:
+            chats.update_thread(client, body.thread_id, title="Untitled Analysis")
+            thread["title"] = "Untitled Analysis"
+
+        # Truncate all downstream messages after target
+        downstream_msgs = all_msgs[target_idx + 1 :]
+        if downstream_msgs:
+            downstream_ids = [str(m["id"]) for m in downstream_msgs]
+            client.table("chat_messages").delete().in_("id", downstream_ids).execute()
+
+        # Update the user message's content
+        client.table("chat_messages").update({"content": content}).eq("id", str(target_edit_id)).execute()
+        parsed_parent_id = target_edit_id
+    elif body.parent_user_message_id:
         try:
             parsed_parent_id = uuid.UUID(body.parent_user_message_id)
         except (ValueError, TypeError):

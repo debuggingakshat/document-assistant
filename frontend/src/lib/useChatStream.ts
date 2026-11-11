@@ -118,7 +118,7 @@ export function useChatStream({ threadId }: UseChatStreamOptions) {
     async (
       content: string,
       modelOverride?: string,
-      options?: { parentUserMessageId?: string }
+      options?: { parentUserMessageId?: string; editMessageId?: string }
     ) => {
       const trimmed = content.trim()
       if (!trimmed || isStreaming) return
@@ -130,7 +130,8 @@ export function useChatStream({ threadId }: UseChatStreamOptions) {
       })
 
       const parentUserMessageId = options?.parentUserMessageId
-      const userMessageId = parentUserMessageId || `user-${Date.now()}`
+      const editMessageId = options?.editMessageId
+      const userMessageId = parentUserMessageId || editMessageId || `user-${Date.now()}`
       const assistantMessageId = `assistant-${Date.now()}`
 
       let targetThreadId = activeThreadId || threadId
@@ -146,12 +147,28 @@ export function useChatStream({ threadId }: UseChatStreamOptions) {
         citations: [],
         suggested_followups: [],
         ai_sdk_metadata: {
-          parent_user_message_id: parentUserMessageId,
+          parent_user_message_id: parentUserMessageId || editMessageId,
           model: modelOverride || localStorage.getItem("selected_llm_model") || "gemini-2.5-flash",
         },
       }
 
-      if (parentUserMessageId) {
+      if (editMessageId) {
+        // Edit turn: truncate messages from edit target and mount updated prompt + fresh assistant response
+        setMessages((prev) => {
+          const editIdx = prev.findIndex((m) => m.id === editMessageId)
+          if (editIdx === -1) return prev
+          const targetMsg = prev[editIdx]
+          const updated = [
+            ...prev.slice(0, editIdx),
+            { ...targetMsg, content: trimmed },
+            initialAssistantMsg,
+          ]
+          if (targetThreadId) {
+            threadMessagesCache.set(targetThreadId, updated)
+          }
+          return updated
+        })
+      } else if (parentUserMessageId) {
         // Regeneration turn: append new assistant version under the existing user prompt
         setMessages((prev) => [...prev, initialAssistantMsg])
       } else {
@@ -215,7 +232,8 @@ export function useChatStream({ threadId }: UseChatStreamOptions) {
             threadId: targetThreadId,
             messages: [{ role: "user", content: trimmed }],
             model: modelOverride || localStorage.getItem("selected_llm_model") || "gemini-2.5-flash",
-            parentUserMessageId,
+            parentUserMessageId: parentUserMessageId || editMessageId,
+            editMessageId,
           }),
         })
 

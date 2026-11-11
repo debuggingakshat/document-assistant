@@ -425,6 +425,13 @@ export function ChatArea({ threadId }: ChatAreaProps) {
     })
   }
 
+  function handleEditPrompt(messageId: string, newContent: string) {
+    if (isStreaming) return
+    void sendMessage(newContent, undefined, {
+      editMessageId: messageId,
+    })
+  }
+
   // Detect if user has scrolled away from the bottom
   function handleScroll() {
     const el = scrollContainerRef.current
@@ -597,6 +604,7 @@ export function ChatArea({ threadId }: ChatAreaProps) {
                       <MessageItem
                         message={turn.userMessage}
                         onRetryPrompt={() => handleRetryPrompt(turn.userMessage!)}
+                        onEditPrompt={handleEditPrompt}
                         hasResponse={hasAssistantResponse}
                         isStreaming={isStreaming}
                       />
