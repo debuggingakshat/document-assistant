@@ -51,14 +51,24 @@ export function SharedThreadPage() {
       {/* Top Header Bar */}
       <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center justify-between border-b border-border/80 bg-background/95 backdrop-blur-md px-4 sm:px-8 select-none">
         <div className="flex items-center gap-3">
-          <Link to="/" className="flex items-center gap-2 hover:opacity-85 transition-opacity">
-            <span className="flex size-7 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-sm shadow-xs">
-              M
-            </span>
-            <span className="font-semibold text-sm tracking-tight text-foreground hidden sm:inline">
-              Meridian Document Assistant
-            </span>
+          <Link
+            to="/"
+            className="flex items-center shrink-0 hover:opacity-85 transition-opacity"
+            title="Meridian Research Document Assistant"
+          >
+            <img
+              src="/meridian-logo-light.png"
+              alt="Meridian Research"
+              className="h-7 sm:h-7.5 w-auto object-contain dark:hidden"
+            />
+            <img
+              src="/meridian-logo-dark.png"
+              alt="Meridian Research"
+              className="h-7 sm:h-7.5 w-auto object-contain hidden dark:block"
+            />
           </Link>
+
+          <div className="h-4 w-px bg-border/60" />
 
           <Badge variant="secondary" className="text-[11px] font-mono gap-1.5 py-0.5">
             <Share2 className="size-3 text-primary" />
